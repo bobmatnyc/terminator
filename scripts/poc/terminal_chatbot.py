@@ -410,6 +410,183 @@ class UnifiedTerminalManager:
         else:
             return SessionState.RUNNING
 
+    def _analyze_session_status(self, output: str) -> dict:
+        """
+        Analyze terminal output to determine working status and provide summary.
+
+        Returns:
+            Dict with keys:
+            - is_working: bool indicating if session is actively processing
+            - status: str enum ("working" | "idle" | "waiting_for_input" | "unknown")
+            - screen_summary: str condensed description of screen content
+            - last_lines: list[str] of last few relevant lines
+            - indicators: dict of detected patterns
+        """
+        if not output:
+            return {
+                "is_working": False,
+                "status": "unknown",
+                "screen_summary": "No output available",
+                "last_lines": [],
+                "indicators": {}
+            }
+
+        lines = output.strip().split("\n")
+        last_lines = lines[-5:] if len(lines) >= 5 else lines
+        last_line = lines[-1].strip() if lines else ""
+
+        # Detect working indicators
+        spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏|/-\\"
+        has_spinner = any(char in output for char in spinner_chars)
+
+        progress_patterns = [
+            "[====", "====>", "loading", "processing", "Loading", "Processing",
+            "%]", "% ", "downloading", "installing", "building", "compiling"
+        ]
+        has_progress = any(pattern in output for pattern in progress_patterns)
+
+        working_keywords = [
+            "running", "executing", "building", "compiling", "installing",
+            "downloading", "fetching", "processing", "loading", "waiting",
+            "analyzing", "generating", "creating"
+        ]
+        has_working_keyword = any(
+            keyword.lower() in output.lower() for keyword in working_keywords
+        )
+
+        # Detect idle/prompt indicators
+        prompt_chars = ["$", "#", ">", ">>>", "❯", "➜", "%"]
+        has_prompt = any(last_line.endswith(char) for char in prompt_chars)
+
+        # Check for waiting for input patterns
+        waiting_patterns = [
+            "press any key", "enter to continue", "continue?", "y/n",
+            "password:", "username:", "[y/N]", "[Y/n]"
+        ]
+        waiting_for_input = any(
+            pattern.lower() in last_line.lower() for pattern in waiting_patterns
+        )
+
+        # Determine status
+        indicators = {
+            "has_spinner": has_spinner,
+            "has_progress": has_progress,
+            "has_working_keyword": has_working_keyword,
+            "has_prompt": has_prompt,
+            "waiting_for_input": waiting_for_input
+        }
+
+        is_working = (has_spinner or has_progress or has_working_keyword) and not has_prompt
+
+        if waiting_for_input:
+            status = "waiting_for_input"
+        elif has_prompt and not is_working:
+            status = "idle"
+        elif is_working:
+            status = "working"
+        else:
+            status = "unknown"
+
+        # Generate screen summary
+        screen_summary = self._generate_screen_summary(lines, status, indicators)
+
+        return {
+            "is_working": is_working,
+            "status": status,
+            "screen_summary": screen_summary,
+            "last_lines": last_lines,
+            "indicators": indicators
+        }
+
+    def _generate_screen_summary(
+        self,
+        lines: list[str],
+        status: str,
+        indicators: dict
+    ) -> str:
+        """Generate a concise summary of what's on screen."""
+        if not lines:
+            return "Empty screen"
+
+        # Count non-empty lines
+        non_empty = [line for line in lines if line.strip()]
+        if not non_empty:
+            return "Empty screen"
+
+        # Identify key content
+        summary_parts = []
+
+        # Status prefix
+        if status == "working":
+            summary_parts.append("Session is actively processing.")
+        elif status == "idle":
+            summary_parts.append("Session is idle at prompt.")
+        elif status == "waiting_for_input":
+            summary_parts.append("Session is waiting for user input.")
+
+        # Detect command patterns (lines starting with $ or >)
+        commands = [line for line in non_empty if any(
+            line.strip().startswith(c) for c in ["$", "#", ">", ">>>"]
+        )]
+        if commands:
+            last_command = commands[-1].strip()
+            summary_parts.append(f"Last command: {last_command[:50]}")
+
+        # Detect error patterns
+        error_keywords = ["error:", "failed", "exception", "traceback", "fatal"]
+        errors = [line for line in non_empty if any(
+            kw in line.lower() for kw in error_keywords
+        )]
+        if errors:
+            summary_parts.append(f"Errors detected ({len(errors)} lines)")
+
+        # Detect progress/working indicators
+        if indicators.get("has_progress"):
+            summary_parts.append("Progress indicator visible")
+        if indicators.get("has_spinner"):
+            summary_parts.append("Spinner/loading animation active")
+
+        # Detect completion messages
+        completion_keywords = ["done", "complete", "finished", "success"]
+        completions = [line for line in non_empty if any(
+            kw in line.lower() for kw in completion_keywords
+        )]
+        if completions and not indicators.get("is_working"):
+            summary_parts.append("Task appears completed")
+
+        # Add line count
+        summary_parts.append(f"({len(non_empty)} lines of output)")
+
+        return " ".join(summary_parts)
+
+    async def get_session_status(self, session_id: str) -> dict:
+        """
+        Get comprehensive status of a session with analysis.
+
+        This is a higher-level method that combines screen capture
+        with intelligent analysis to provide working status.
+
+        Args:
+            session_id: Session to analyze
+
+        Returns:
+            Dict with status information and screen digest
+        """
+        # Capture more lines for better context
+        output = await self.get_session_output(session_id, lines=100)
+
+        # Analyze the output
+        analysis = self._analyze_session_status(output)
+
+        # Add session metadata
+        session = self._sessions_cache.get(session_id)
+        if session:
+            analysis["session_name"] = session.name
+            analysis["session_type"] = session.terminal_type.value
+            analysis["cwd"] = session.cwd
+
+        return analysis
+
 
 # =============================================================================
 # Terminal Chatbot
@@ -434,6 +611,23 @@ TERMINAL_TOOLS = [
         "function": {
             "name": "get_session_state",
             "description": "Get the current state of a terminal session (idle or running) and its recent output",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "The session ID to check"
+                    }
+                },
+                "required": ["session_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_session_status",
+            "description": "Get a status digest of a terminal session - samples the current screen, determines if the session is working or idle, and provides a summary of what's visible. Use this when the user asks 'What's happening?', 'Is it still working?', 'What's it doing?', or 'Check on [session]'.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -503,12 +697,19 @@ You can:
 2. Send messages or prompts to any session
 3. Read the current output/response from any session
 4. Monitor sessions for responses
+5. Get intelligent status digests (use get_session_status to check if session is working/idle)
 
 When the user asks you to communicate with a session:
 1. List sessions if needed to find the right one
 2. Send the user's message to that session (just the natural text, no special formatting)
 3. Wait briefly and read the response
 4. Summarize or relay the response back to the user
+
+When the user asks about session status (e.g., "What's happening?", "Is it still working?", "What's [session] doing?", "Check on [session]"):
+1. Use get_session_status to get a comprehensive digest
+2. The tool will tell you if the session is working/idle/waiting_for_input
+3. It provides a screen summary and last few lines
+4. Relay this information naturally to the user
 
 You're essentially a messenger between the user and their terminal sessions. Keep your communication natural and conversational. When sending to Claude Code sessions, just send the plain text message - no need for shell command syntax.
 
@@ -555,6 +756,22 @@ class TerminalChatbot:
                     "session_id": session_id,
                     "state": state.value,
                     "recent_output": output[-1000:] if len(output) > 1000 else output
+                })
+
+            elif name == "get_session_status":
+                session_id = args["session_id"]
+                status = await self.terminal.get_session_status(session_id)
+                # Return comprehensive status digest
+                return json.dumps({
+                    "session_id": session_id,
+                    "is_working": status["is_working"],
+                    "status": status["status"],
+                    "screen_summary": status["screen_summary"],
+                    "last_lines": status["last_lines"],
+                    "indicators": status["indicators"],
+                    "session_name": status.get("session_name", ""),
+                    "session_type": status.get("session_type", ""),
+                    "cwd": status.get("cwd", "")
                 })
 
             elif name == "send_command":
