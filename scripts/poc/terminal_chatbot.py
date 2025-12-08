@@ -1,12 +1,15 @@
 """
-Terminal Chatbot POC - LLM-powered terminal control assistant.
+Terminal Chatbot POC - LLM-powered terminal communication assistant.
 
 This script demonstrates:
 a) Listing open iTerm2 and/or tmux sessions
-b) Determining terminal state (idle/running)
-c) Sending commands to sessions
-d) Interpreting results and detecting command completion
-e) Explaining results to the user
+b) Sending natural language messages to Claude Code/REPL sessions
+c) Reading responses from sessions
+d) Interpreting and summarizing session output
+e) Acting as a messenger between user and terminal sessions
+
+Primary use case: Communicate with Claude Code sessions using natural language.
+Secondary use case: Execute shell commands in terminal sessions.
 
 Requirements:
 - OpenRouter API key in .env.local or .env
@@ -447,21 +450,21 @@ TERMINAL_TOOLS = [
         "type": "function",
         "function": {
             "name": "send_command",
-            "description": "Send a command to a terminal session and get the result",
+            "description": "Send text/message to a terminal session. For Claude Code or REPL sessions, this sends your message as a chat prompt. For shell sessions, this executes a command.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "The session ID to send the command to"
+                        "description": "The session ID to send the message/command to"
                     },
                     "command": {
                         "type": "string",
-                        "description": "The command to execute"
+                        "description": "The message or command to send. For Claude Code/REPL sessions, use natural language. For shell sessions, use command syntax."
                     },
                     "wait_for_completion": {
                         "type": "boolean",
-                        "description": "Whether to wait for the command to complete (default: true)",
+                        "description": "Whether to wait for a response/completion (default: true)",
                         "default": True
                     }
                 },
@@ -493,28 +496,27 @@ TERMINAL_TOOLS = [
     }
 ]
 
-SYSTEM_PROMPT = """You are TermPilot, an AI assistant that helps users manage and interact with their terminal sessions.
+SYSTEM_PROMPT = """You are TermPilot, an AI assistant that helps users communicate with their terminal sessions, especially Claude Code instances.
 
-You have access to both iTerm2 and tmux terminal sessions. You can:
-1. List all available terminal sessions
-2. Check the state of any session (idle vs running a command)
-3. Send commands to sessions and see the results
-4. Read the output/content from any session
+You can:
+1. List all available terminal sessions (iTerm2 and tmux)
+2. Send messages or prompts to any session
+3. Read the current output/response from any session
+4. Monitor sessions for responses
 
-When the user asks you to do something in a terminal:
-1. First list available sessions if you don't know what's available
-2. Identify the appropriate session based on its name or let the user choose
-3. Check the session state before sending commands
-4. Send the command and wait for completion
-5. Interpret the results and explain them clearly to the user
+When the user asks you to communicate with a session:
+1. List sessions if needed to find the right one
+2. Send the user's message to that session (just the natural text, no special formatting)
+3. Wait briefly and read the response
+4. Summarize or relay the response back to the user
 
-Session IDs follow these formats:
-- tmux: "tmux:session_name:window_index:pane_index" (e.g., "tmux:main:0:0")
-- iTerm2: "iterm2:session_uuid" (e.g., "iterm2:ABC123-DEF456...")
+You're essentially a messenger between the user and their terminal sessions. Keep your communication natural and conversational. When sending to Claude Code sessions, just send the plain text message - no need for shell command syntax.
 
-Be helpful, concise, and proactive. If a command fails or produces an error, explain what went wrong and suggest solutions.
+Session IDs:
+- tmux: "tmux:session_name:window_index:pane_index"
+- iTerm2: "iterm2:session_uuid"
 
-Important: Always interpret terminal output for the user - don't just dump raw output, explain what it means."""
+Be helpful and concise. Interpret and summarize terminal responses rather than dumping raw output. When communicating with Claude Code or REPL sessions, you're having a conversation on behalf of the user."""
 
 
 class TerminalChatbot:
