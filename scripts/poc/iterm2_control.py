@@ -175,6 +175,11 @@ class ITerm2Controller:
 
         Returns:
             True if successful
+
+        Note:
+            Uses \\r (carriage return) instead of \\n for command execution,
+            per iTerm2 Python API best practices. This ensures commands are
+            executed properly in all session types including SSH sessions.
         """
         app = await self.get_app()
         session = app.get_session_by_id(session_id)
@@ -183,7 +188,7 @@ class ITerm2Controller:
             raise RuntimeError(f"Session not found: {session_id}")
 
         if newline:
-            text = text + "\n"
+            text = text + "\r"
 
         await session.async_send_text(text)
         return True
