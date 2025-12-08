@@ -1,3 +1,6 @@
+# Claude MPM (entire directory)
+.claude-mpm/
+
 # MCP Ticketer
 .mcp-ticketer/
 
@@ -54,3 +57,73 @@ dmypy.json
 
 # Ruff
 .ruff_cache/
+
+# Added by Claude MPM /mpm-init
+$RECYCLE.BIN/
+*.backup
+*.bak
+*.cab
+*.cache
+*.cert
+*.cover
+*.crt
+*.db
+*.key
+*.lnk
+*.log
+*.manifest
+*.mpm.tmp
+*.msi
+*.msm
+*.msp
+*.old
+*.pem
+*.pytest_cache
+*.spec
+*.sql
+*.sqlite
+*.sqlite3
+*.sublime-project
+*.sublime-workspace
+*.temp
+*.tmp
+.DS_Store
+.claude/cache/
+.claude/sessions/
+.conda/
+.coverage.*
+.env.*
+.hypothesis/
+.kuzu-memory/
+.mcp-vector-search/
+.npm
+.project
+.pydevproject
+.pytype/
+.secrets/
+.settings/
+.venv
+.yarn/
+Desktop.ini
+Thumbs.db
+_build/
+backup/
+backups/
+conda-env/
+coverage.xml
+credentials/
+docs/_build/
+ehthumbs.db
+env.bak/
+kuzu-memories/
+logs/
+node_modules/
+npm-debug.log*
+pip-wheel-metadata/
+site/
+temp/
+tmp/
+venv.bak/
+virtualenv/
+yarn-debug.log*
+yarn-error.log*
