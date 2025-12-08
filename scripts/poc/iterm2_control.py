@@ -163,7 +163,8 @@ class ITerm2Controller:
         self,
         session_id: str,
         text: str,
-        newline: bool = True
+        newline: bool = True,
+        line_ending: str = "\r"
     ) -> bool:
         """
         Send text to a session.
@@ -171,17 +172,28 @@ class ITerm2Controller:
         Args:
             session_id: Target session
             text: Text to send
-            newline: Whether to append newline (simulates pressing Enter)
+            newline: Whether to append line ending (simulates pressing Enter)
+            line_ending: Line ending character(s) to append when newline=True.
+                        Default is \\r (carriage return) which works for both:
+                        - Interactive REPLs (Claude Code, Python REPL, etc.)
+                        - Shell prompts (bash, zsh, etc.)
+                        Use \\n if you need LF specifically (rare cases).
 
         Returns:
             True if successful
 
         Note:
-            Uses \\n (newline/LF) for command execution. The iTerm2 async_send_text
-            method interprets \\n as pressing Enter, which causes the shell to
-            execute the command. This works correctly in all session types including
-            SSH sessions, as long as the session is at an interactive shell prompt
-            (not running another program that might intercept input).
+            \\r (carriage return) is the default because it provides better
+            compatibility with interactive applications and REPLs. The iTerm2
+            async_send_text method sends the character directly to the terminal,
+            and \\r is what most interactive programs expect when you press Enter.
+            This works correctly in:
+            - Shell prompts (bash, zsh, fish)
+            - Python/Node.js REPLs
+            - Interactive CLIs like Claude Code
+            - SSH sessions
+
+            Use \\n (newline/LF) only if \\r doesn't work for your specific use case.
         """
         app = await self.get_app()
         session = app.get_session_by_id(session_id)
@@ -190,7 +202,7 @@ class ITerm2Controller:
             raise RuntimeError(f"Session not found: {session_id}")
 
         if newline:
-            text = text + "\n"
+            text = text + line_ending
 
         await session.async_send_text(text)
         return True
