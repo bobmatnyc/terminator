@@ -717,7 +717,9 @@ Session IDs:
 - tmux: "tmux:session_name:window_index:pane_index"
 - iTerm2: "iterm2:session_uuid"
 
-Be helpful and concise. Interpret and summarize terminal responses rather than dumping raw output. When communicating with Claude Code or REPL sessions, you're having a conversation on behalf of the user."""
+Be helpful and concise. Interpret and summarize terminal responses rather than dumping raw output. When communicating with Claude Code or REPL sessions, you're having a conversation on behalf of the user.
+
+IMPORTANT: Keep responses brief and conversational by default - aim for 1-3 sentences for status updates. Avoid bullet points, headers, or structured lists unless the user specifically asks for details or you need to present complex information. Think of it like texting a colleague - get straight to the point. If there's a lot of information to share, summarize the key point first and mention that you can provide more details if they'd like. Don't dump raw data or structured lists unless explicitly requested."""
 
 
 class TerminalChatbot:
