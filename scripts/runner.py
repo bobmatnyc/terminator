@@ -7,6 +7,7 @@ Usage:
 """
 import sys
 import asyncio
+import inspect
 import importlib
 from pathlib import Path
 from dotenv import load_dotenv
@@ -32,7 +33,7 @@ def main():
         module = importlib.import_module(f"scripts.{script_name}")
 
         if hasattr(module, "main"):
-            if asyncio.iscoroutinefunction(module.main):
+            if inspect.iscoroutinefunction(module.main):
                 asyncio.run(module.main(*script_args))
             else:
                 module.main(*script_args)

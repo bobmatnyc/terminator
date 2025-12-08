@@ -376,15 +376,15 @@ async def demo_basic_operations(connection: iterm2.Connection):
     cwd = await controller.get_session_variable(session_id, "path")
     console.print(f"[green]Working directory:[/green] {cwd}")
 
-    # Cleanup prompt
+    # Cleanup - auto-close demo window after brief pause
     console.print("\n[yellow]Demo complete![/yellow]")
-    if Confirm.ask("Close the demo window?", default=True):
-        # Close the new pane first, then the original session
-        await controller.close_session(new_session_id, force=True)
-        await controller.close_session(session_id, force=True)
-        console.print("[green]Demo window closed.[/green]")
-    else:
-        console.print("[blue]Demo window left open for inspection.[/blue]")
+    console.print("[dim]Closing demo window in 2 seconds...[/dim]")
+    await asyncio.sleep(2)
+
+    # Close the new pane first, then the original session
+    await controller.close_session(new_session_id, force=True)
+    await controller.close_session(session_id, force=True)
+    console.print("[green]Demo window closed.[/green]")
 
 
 async def interactive_mode(connection: iterm2.Connection):
@@ -513,11 +513,11 @@ async def run_poc(mode: str = "info"):
             console.print("\n[dim]Run with --demo for full demonstration[/dim]")
             console.print("[dim]Run with --interactive for interactive mode[/dim]")
 
-    except iterm2.AppNotRunningError:
-        console.print("[red]Error: iTerm2 is not running![/red]")
-        console.print("Please start iTerm2 and try again.")
-        sys.exit(1)
     except Exception as e:
+        if "not running" in str(e).lower():
+            console.print("[red]Error: iTerm2 is not running![/red]")
+            console.print("Please start iTerm2 and try again.")
+            sys.exit(1)
         console.print(f"[red]Error connecting to iTerm2:[/red] {e}")
         console.print("\nMake sure:")
         console.print("  1. iTerm2 is running")
