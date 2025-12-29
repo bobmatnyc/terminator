@@ -103,8 +103,8 @@ class LLMService:
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://github.com/bobmatnyc/termpilot",
-                    "X-Title": "TermPilot",
+                    "HTTP-Referer": "https://github.com/bobmatnyc/terminator",
+                    "X-Title": "Terminator",
                 },
                 json=payload,
                 timeout=60.0,

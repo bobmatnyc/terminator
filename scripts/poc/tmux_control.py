@@ -393,7 +393,7 @@ def demo_basic_operations():
 
     console.print(Panel.fit(
         "[bold green]tmux Control POC - Basic Operations Demo[/bold green]",
-        title="TermPilot"
+        title="Terminator"
     ))
 
     # 1. Connect to tmux
@@ -425,7 +425,7 @@ def demo_basic_operations():
         console.print("[dim]No existing sessions[/dim]")
 
     # 3. Create a demo session
-    demo_session_name = "termpilot-demo"
+    demo_session_name = "terminator-demo"
     console.print(f"\n[blue]3. Creating session: {demo_session_name}[/blue]")
 
     # Kill existing demo session if present
@@ -439,8 +439,8 @@ def demo_basic_operations():
     console.print(f"[green]Pane ID:[/green] {pane_id}")
 
     # 4. Send a command
-    console.print("\n[blue]4. Sending command: echo 'Hello from TermPilot!'[/blue]")
-    controller.send_keys(demo_session_name, "echo 'Hello from TermPilot!'")
+    console.print("\n[blue]4. Sending command: echo 'Hello from Terminator!'[/blue]")
+    controller.send_keys(demo_session_name, "echo 'Hello from Terminator!'")
 
     # Wait for command to complete
     time.sleep(0.5)
@@ -532,7 +532,7 @@ def interactive_mode():
 
     console.print(Panel.fit(
         "[bold green]tmux Control POC - Interactive Mode[/bold green]",
-        title="TermPilot"
+        title="Terminator"
     ))
 
     # Connect
@@ -555,7 +555,7 @@ def interactive_mode():
     # Select or create session
     choice = Prompt.ask(
         "Select session number, or enter name to create new",
-        default="termpilot-interactive"
+        default="terminator-interactive"
     )
 
     if choice.isdigit() and sessions:
@@ -681,7 +681,7 @@ def run_poc(mode: str = "info"):
         # Default: just list sessions
         console.print(Panel.fit(
             "[bold green]tmux Control POC[/bold green]",
-            title="TermPilot"
+            title="Terminator"
         ))
 
         console.print("\n[blue]Connecting to tmux server...[/blue]")

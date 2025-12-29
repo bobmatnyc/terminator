@@ -1,4 +1,4 @@
-"""Entry point for python -m termpilot."""
+"""Entry point for python -m terminator."""
 
 from .cli.main import app
 

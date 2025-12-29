@@ -113,7 +113,7 @@ async def run_chat():
         console.print("[yellow]No sessions found[/yellow]")
 
     # Chat loop
-    console.print("\n[bold]Chat with TermPilot[/bold]")
+    console.print("\n[bold]Chat with Terminator[/bold]")
     console.print("[dim]Type 'quit' to exit, 'clear' to reset conversation[/dim]\n")
 
     while True:
@@ -141,7 +141,7 @@ async def run_chat():
             console.print(
                 Panel(
                     Markdown(response) if response else "[dim]No response[/dim]",
-                    title="[bold green]TermPilot[/bold green]",
+                    title="[bold green]Terminator[/bold green]",
                     border_style="green",
                 )
             )

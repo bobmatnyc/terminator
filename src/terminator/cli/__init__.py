@@ -1,4 +1,4 @@
-"""CLI module for TermPilot."""
+"""CLI module for Terminator."""
 
 from .main import app
 

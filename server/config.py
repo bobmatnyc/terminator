@@ -19,5 +19,5 @@ class Settings(BaseSettings):
 
     model_config = {
         "env_file": ".env",
-        "env_prefix": "TERMPILOT_",
+        "env_prefix": "TERMINATOR_",
     }

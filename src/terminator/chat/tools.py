@@ -93,7 +93,7 @@ TERMINAL_TOOLS = [
     },
 ]
 
-SYSTEM_PROMPT = """You are TermPilot, an AI assistant that helps users communicate with their terminal sessions, especially Claude Code instances.
+SYSTEM_PROMPT = """You are Terminator, an AI assistant that helps users communicate with their terminal sessions, especially Claude Code instances.
 
 You can:
 1. List all available terminal sessions (iTerm2 and tmux)
