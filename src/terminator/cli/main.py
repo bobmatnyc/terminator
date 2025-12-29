@@ -268,5 +268,87 @@ async def run_read(session_id: str, lines: int):
     console.print(Panel(output, title=f"Output ({lines} lines)", border_style="green"))
 
 
+@app.command()
+def start(
+    project_path: str = typer.Argument(..., help="Path to project directory"),
+    agent: str = typer.Option(
+        "shell",
+        "--agent",
+        "-a",
+        help="Agent type (claude-code, auggie, python, node, shell)",
+    ),
+    name: str = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Custom session name (defaults to project directory name)",
+    ),
+):
+    """Start a new coding session in a project directory."""
+    asyncio.run(run_start(project_path, agent, name))
+
+
+async def run_start(project_path: str, agent: str, name: str | None):
+    """Start new coding session."""
+    container = get_container()
+    terminal_service = container.get_terminal_service()
+
+    # Connect to terminals
+    console.print("[blue]Connecting to terminal backends...[/blue]")
+    status = await terminal_service.connect_all()
+
+    if not any(status.values()):
+        console.print("[red]No terminal backends available![/red]")
+        console.print("Please ensure tmux or iTerm2 is running.")
+        raise typer.Exit(1)
+
+    # Show which backend will be used
+    backend = "tmux" if status.get("tmux") else "iTerm2"
+    console.print(f"[green]Using {backend} backend[/green]")
+
+    # Map agent names for display
+    agent_display_names = {
+        "claude-code": "Claude Code",
+        "auggie": "Auggie",
+        "python": "Python REPL",
+        "node": "Node.js REPL",
+        "shell": "Shell",
+    }
+    agent_display = agent_display_names.get(agent, agent)
+
+    # Get project name for display
+    from pathlib import Path
+
+    project_name = name or Path(project_path).expanduser().resolve().name
+
+    console.print(f"[blue]Starting {agent_display} in {project_name}...[/blue]")
+
+    try:
+        # Create session
+        project_address = await terminal_service.start_session(
+            project_path=project_path,
+            agent=agent,
+            name=name,
+        )
+
+        # Success message
+        console.print()
+        console.print(f"[green]✓[/green] Session created: [cyan bold]{project_address}[/cyan bold] ({agent})")
+        console.print()
+
+        # Show connection instructions
+        if backend == "tmux":
+            console.print(f"[dim]Connect: tmux attach -t {project_name}[/dim]")
+        else:
+            console.print(f"[dim]Session opened in iTerm2[/dim]")
+
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+    except RuntimeError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

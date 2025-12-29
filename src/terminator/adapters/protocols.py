@@ -135,3 +135,21 @@ class ITerminalAdapter(Protocol):
             Dict with status information and screen digest
         """
         ...
+
+    async def create_session(
+        self,
+        name: str,
+        working_dir: str,
+        command: str | None = None,
+    ) -> str:
+        """Create a new terminal session.
+
+        Args:
+            name: Session name
+            working_dir: Initial working directory
+            command: Optional command to run (if None, just opens shell)
+
+        Returns:
+            Session ID of the newly created session
+        """
+        ...

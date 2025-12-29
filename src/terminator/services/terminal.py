@@ -272,3 +272,99 @@ class TerminalService:
         elif session_id.startswith("iterm2:"):
             return self._adapters.get("iterm2")
         return None
+
+    async def start_session(
+        self,
+        project_path: str,
+        agent: str = "shell",
+        name: Optional[str] = None,
+    ) -> str:
+        """Start a new coding session.
+
+        Creates a new terminal session in the specified project directory,
+        optionally running an agent command (Claude Code, Auggie, etc.).
+
+        Args:
+            project_path: Path to the project directory
+            agent: Agent type (claude-code, auggie, python, node, shell)
+            name: Custom session name (defaults to project directory name)
+
+        Returns:
+            Project address (@project or @project:N)
+
+        Raises:
+            RuntimeError: If no terminal backends are available or session creation fails
+        """
+        from pathlib import Path
+
+        # Validate project path
+        project_dir = Path(project_path).expanduser().resolve()
+        if not project_dir.exists():
+            raise RuntimeError(f"Project directory does not exist: {project_path}")
+
+        if not project_dir.is_dir():
+            raise RuntimeError(f"Path is not a directory: {project_path}")
+
+        # Determine session name (default to project directory name)
+        session_name = name or project_dir.name
+
+        # Get agent command from config
+        from ..config import get_settings
+
+        settings = get_settings()
+        agent_commands = {
+            "claude-code": settings.agent_claude_code_cmd,
+            "auggie": settings.agent_auggie_cmd,
+            "python": settings.agent_python_cmd,
+            "node": settings.agent_node_cmd,
+            "shell": None,  # No command for shell
+        }
+
+        if agent not in agent_commands:
+            raise ValueError(
+                f"Unknown agent type: {agent}. "
+                f"Valid options: {', '.join(agent_commands.keys())}"
+            )
+
+        command = agent_commands[agent]
+
+        # Try to create session with preferred backend (tmux first, then iTerm2)
+        session_id: Optional[str] = None
+
+        if "tmux" in self._adapters:
+            try:
+                session_id = await self.tmux.create_session(
+                    name=session_name,
+                    working_dir=str(project_dir),
+                    command=command,
+                )
+            except Exception as e:
+                # Log error but try next backend
+                pass
+
+        if not session_id and "iterm2" in self._adapters:
+            try:
+                session_id = await self.iterm2.create_session(
+                    name=session_name,
+                    working_dir=str(project_dir),
+                    command=command,
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to create iTerm2 session: {e}") from e
+
+        if not session_id:
+            raise RuntimeError(
+                "No terminal backends available. Please ensure tmux or iTerm2 is running."
+            )
+
+        # Refresh sessions to register the new one
+        await self.list_all_sessions()
+
+        # Get project address
+        project_address = await self.project_registry.resolve(f"@{session_name}")
+        if not project_address:
+            # If resolve fails, the session might not have been registered yet
+            # Return generic address
+            project_address = f"@{session_name}"
+
+        return project_address

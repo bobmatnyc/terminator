@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # LLM configuration
     llm_temperature: float = 0.7
 
+    # Agent launch commands
+    agent_claude_code_cmd: str = "claude"
+    agent_auggie_cmd: str = "augment"
+    agent_python_cmd: str = "python"
+    agent_node_cmd: str = "node"
+
 
 def get_settings() -> Settings:
     """Get application settings singleton.

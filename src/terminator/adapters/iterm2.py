@@ -340,3 +340,65 @@ class ITerm2Adapter:
         summary_parts.append(f"({len(non_empty)} lines of output)")
 
         return " ".join(summary_parts)
+
+    async def create_session(
+        self,
+        name: str,
+        working_dir: str,
+        command: Optional[str] = None,
+    ) -> str:
+        """Create a new iTerm2 session.
+
+        Args:
+            name: Session name
+            working_dir: Initial working directory
+            command: Optional command to run (if None, just opens shell)
+
+        Returns:
+            Session ID of the newly created session (format: iterm2:session_id)
+
+        Raises:
+            RuntimeError: If session creation fails
+        """
+        if not self._app:
+            raise RuntimeError("Not connected to iTerm2")
+
+        try:
+            import iterm2
+
+            # Get current window or create new one
+            window = self._app.current_terminal_window
+            if not window:
+                window = await iterm2.Window.async_create(self._connection)
+
+            # Create new tab
+            tab = await window.async_create_tab()
+            if not tab:
+                raise RuntimeError("Failed to create tab")
+
+            # Get the session from the new tab
+            session = tab.current_session
+            if not session:
+                raise RuntimeError("Failed to get session from new tab")
+
+            # Set session name
+            await session.async_set_name(name)
+
+            # Change to working directory and run command if provided
+            cd_command = f"cd {working_dir}"
+            await session.async_send_text(cd_command + "\r")
+
+            # Wait a bit for cd to complete
+            await asyncio.sleep(0.3)
+
+            # Send the command if provided
+            if command:
+                await session.async_send_text(command + "\r")
+
+            # Build session ID
+            session_id = f"iterm2:{session.session_id}"
+
+            return session_id
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to create iTerm2 session: {e}") from e

@@ -392,3 +392,54 @@ class TmuxAdapter:
         summary_parts.append(f"({len(non_empty)} lines of output)")
 
         return " ".join(summary_parts)
+
+    async def create_session(
+        self,
+        name: str,
+        working_dir: str,
+        command: Optional[str] = None,
+    ) -> str:
+        """Create a new tmux session.
+
+        Args:
+            name: Session name
+            working_dir: Initial working directory
+            command: Optional command to run (if None, just opens shell)
+
+        Returns:
+            Session ID of the newly created session (format: tmux:name:0:0)
+
+        Raises:
+            RuntimeError: If session creation fails
+        """
+        if not self._server:
+            raise RuntimeError("Not connected to tmux server")
+
+        try:
+            # Create new session with start-directory
+            # The session will start in the specified directory
+            session = await asyncio.to_thread(
+                self._server.new_session,
+                session_name=name,
+                start_directory=working_dir,
+                attach=False,  # Don't attach to it
+            )
+
+            # If a command is provided, send it to the first pane
+            if command:
+                windows = await asyncio.to_thread(lambda: list(session.windows))
+                if windows:
+                    window = windows[0]
+                    panes = await asyncio.to_thread(lambda: list(window.panes))
+                    if panes:
+                        pane = panes[0]
+                        # Send command with enter
+                        await asyncio.to_thread(pane.send_keys, command, enter=True)
+
+            # Build session ID (tmux:session_name:window_index:pane_index)
+            session_id = f"tmux:{name}:0:0"
+
+            return session_id
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to create tmux session: {e}") from e
