@@ -14,6 +14,7 @@ dependencies = [
     "libtmux>=0.28.0",
     "rich>=13.7.0",
     "typer>=0.9.0",
+    "prompt_toolkit>=3.0.0",
 ]
 
 [project.scripts]

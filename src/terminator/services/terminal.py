@@ -368,3 +368,32 @@ class TerminalService:
             project_address = f"@{session_name}"
 
         return project_address
+
+    async def kill_session(self, session_id: str) -> bool:
+        """Kill a terminal session.
+
+        Supports @project addressing for session lookup.
+
+        Args:
+            session_id: Target session ID or @project address
+
+        Returns:
+            True if session was killed successfully
+        """
+        # Resolve @project address if needed
+        resolved_id = await self._resolve_session_id(session_id)
+        if not resolved_id:
+            return False
+
+        adapter = self._get_adapter_for_session(resolved_id)
+        if not adapter:
+            return False
+
+        # Kill the session
+        success = await adapter.kill_session(resolved_id)
+
+        # Remove from cache if successful
+        if success and resolved_id in self._sessions_cache:
+            del self._sessions_cache[resolved_id]
+
+        return success

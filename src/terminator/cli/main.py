@@ -32,20 +32,40 @@ def main(ctx: typer.Context):
 
 
 @app.command(name="chat")
-def chat():
-    """Start interactive chat mode (default command)."""
-    asyncio.run(run_chat())
+def chat(
+    session: str | None = typer.Argument(
+        None, help="Optional session to focus (e.g., @mcp-ticketer)"
+    ),
+    tui: bool = typer.Option(
+        True, "--tui/--simple", help="Use TUI mode (default) or simple mode"
+    ),
+):
+    """Start interactive chat mode (default command).
+
+    Examples:
+        terminator chat                    # Start TUI chat
+        terminator chat @mcp-ticketer      # Start TUI focused on session
+        terminator chat --simple           # Use simple (non-TUI) mode
+    """
+    asyncio.run(run_chat(initial_focus=session, use_tui=tui))
 
 
-async def run_chat():
-    """Run the interactive chatbot."""
-    console.print(
-        Panel.fit(
-            "[bold green]Terminator - Terminal Chatbot[/bold green]\n"
-            "[dim]LLM-powered terminal control assistant[/dim]",
-            title="Terminator",
+async def run_chat(initial_focus: str | None = None, use_tui: bool = True):
+    """Run the interactive chatbot.
+
+    Args:
+        initial_focus: Optional session to focus on (e.g., "@mcp-ticketer")
+        use_tui: If True, use TUI mode; otherwise use simple mode
+    """
+    # Show startup banner only for simple mode
+    if not use_tui:
+        console.print(
+            Panel.fit(
+                "[bold green]Terminator - Terminal Chatbot[/bold green]\n"
+                "[dim]LLM-powered terminal control assistant[/dim]",
+                title="Terminator",
+            )
         )
-    )
 
     # Initialize container and services
     try:
@@ -61,24 +81,35 @@ async def run_chat():
     terminal_service = container.get_terminal_service()
     chatbot = container.get_chatbot()
 
-    console.print(
-        f"[green]✓[/green] LLM initialized (OpenRouter: {llm_service.model})"
-    )
+    if not use_tui:
+        console.print(
+            f"[green]✓[/green] LLM initialized (OpenRouter: {llm_service.model})"
+        )
 
     # Connect to terminals
-    console.print("[blue]Connecting to terminals...[/blue]")
+    if not use_tui:
+        console.print("[blue]Connecting to terminals...[/blue]")
     status = await terminal_service.connect_all()
 
-    for backend, connected in status.items():
-        if connected:
-            console.print(f"[green]✓[/green] {backend} connected")
-        else:
-            console.print(f"[yellow]○[/yellow] {backend} not available")
+    if not use_tui:
+        for backend, connected in status.items():
+            if connected:
+                console.print(f"[green]✓[/green] {backend} connected")
+            else:
+                console.print(f"[yellow]○[/yellow] {backend} not available")
 
     if not any(status.values()):
         console.print("[red]No terminal backends available![/red]")
         raise typer.Exit(1)
 
+    # If TUI mode, launch the TUI interface
+    if use_tui:
+        from .tui.chat_interface import run_chat_tui
+
+        await run_chat_tui(chatbot, terminal_service, initial_focus=initial_focus)
+        return
+
+    # Below is simple (non-TUI) mode
     # Show available sessions with @project addresses
     sessions = await terminal_service.list_all_sessions()
     if sessions:
@@ -266,6 +297,37 @@ async def run_read(session_id: str, lines: int):
     output = await terminal_service.get_session_output(session_id, lines)
 
     console.print(Panel(output, title=f"Output ({lines} lines)", border_style="green"))
+
+
+@app.command()
+def manage():
+    """Interactive session manager TUI."""
+    asyncio.run(run_manage())
+
+
+async def run_manage():
+    """Run the interactive session manager TUI."""
+    from .tui import SessionManagerTUI
+
+    container = get_container()
+    terminal_service = container.get_terminal_service()
+
+    console.print("[blue]Connecting to terminals...[/blue]")
+    status = await terminal_service.connect_all()
+
+    if not any(status.values()):
+        console.print("[red]No terminal backends available![/red]")
+        console.print("Please ensure tmux or iTerm2 is running.")
+        raise typer.Exit(1)
+
+    # Show which backends are connected
+    for backend, connected in status.items():
+        if connected:
+            console.print(f"[green]✓[/green] {backend} connected")
+
+    # Run TUI
+    tui = SessionManagerTUI(terminal_service)
+    await tui.run()
 
 
 @app.command()

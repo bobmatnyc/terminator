@@ -153,3 +153,14 @@ class ITerminalAdapter(Protocol):
             Session ID of the newly created session
         """
         ...
+
+    async def kill_session(self, session_id: str) -> bool:
+        """Kill a terminal session.
+
+        Args:
+            session_id: Target session ID
+
+        Returns:
+            True if session was killed successfully
+        """
+        ...

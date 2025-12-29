@@ -402,3 +402,42 @@ class ITerm2Adapter:
 
         except Exception as e:
             raise RuntimeError(f"Failed to create iTerm2 session: {e}") from e
+
+    async def kill_session(self, session_id: str) -> bool:
+        """Kill an iTerm2 session.
+
+        Args:
+            session_id: Target session ID (format: iterm2:session_id)
+
+        Returns:
+            True if session was killed successfully
+        """
+        if not self._app:
+            return False
+
+        parts = session_id.split(":", 1)
+        if len(parts) != 2:
+            return False
+
+        iterm2_session_id = parts[1]
+
+        try:
+            # Find the session
+            for window in self._app.windows:
+                for tab in window.tabs:
+                    for session in tab.sessions:
+                        if session.session_id == iterm2_session_id:
+                            # Close the session
+                            await session.async_close(force=True)
+
+                            # Remove from cache
+                            if session_id in self._sessions_cache:
+                                del self._sessions_cache[session_id]
+
+                            return True
+
+            # Session not found
+            return False
+
+        except Exception:
+            return False

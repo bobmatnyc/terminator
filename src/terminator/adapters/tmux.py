@@ -443,3 +443,41 @@ class TmuxAdapter:
 
         except Exception as e:
             raise RuntimeError(f"Failed to create tmux session: {e}") from e
+
+    async def kill_session(self, session_id: str) -> bool:
+        """Kill a tmux session.
+
+        Args:
+            session_id: Target session ID (format: tmux:name:window:pane)
+
+        Returns:
+            True if session was killed successfully
+        """
+        if not self._server:
+            return False
+
+        parts = session_id.split(":")
+        if len(parts) != 4:
+            return False
+
+        session_name = parts[1]
+
+        try:
+            # Get the session
+            session = await asyncio.to_thread(
+                self._server.sessions.get, session_name=session_name
+            )
+            if not session:
+                return False
+
+            # Kill the entire session
+            await asyncio.to_thread(session.kill_session)
+
+            # Remove from cache
+            if session_id in self._sessions_cache:
+                del self._sessions_cache[session_id]
+
+            return True
+
+        except Exception:
+            return False
