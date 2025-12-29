@@ -6,8 +6,8 @@ from typing import Generator
 
 import pytest
 
-from termpilot.adapters.protocols import SessionState, TerminalType, UnifiedSession
-from termpilot.services.project_registry import ProjectRegistry, ProjectSession
+from terminator.adapters.protocols import SessionState, TerminalType, UnifiedSession
+from terminator.services.project_registry import ProjectRegistry, ProjectSession
 
 
 @pytest.fixture

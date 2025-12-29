@@ -127,3 +127,9 @@ venv.bak/
 virtualenv/
 yarn-debug.log*
 yarn-error.log*
+
+# MCP configuration (contains tokens)
+.mcp.json
+
+# Gemini CLI
+.gemini/

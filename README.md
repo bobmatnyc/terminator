@@ -1,10 +1,10 @@
-# TermPilot
+# Terminator
 
 Remote terminal control system with AI assistance.
 
 ## Overview
 
-TermPilot provides remote terminal control capabilities through:
+Terminator provides remote terminal control capabilities through:
 - **Terminal Adapters**: Support for tmux and iTerm2
 - **REST API**: FastAPI-based control interface
 - **LLM Integration**: Local and cloud LLM support for intelligent assistance
@@ -22,7 +22,7 @@ TermPilot provides remote terminal control capabilities through:
 
 ```bash
 # Clone and enter project
-cd termpilot
+cd terminator
 
 # Create virtual environment
 python -m venv .venv
@@ -45,8 +45,8 @@ python -m scripts.runner poc.hello_world
 ## Project Structure
 
 ```
-termpilot/
-├── server/          # Main application
+terminator/
+├── src/terminator/  # Main application
 │   ├── adapters/    # Terminal adapters (tmux, iTerm2)
 │   ├── core/        # Core business logic
 │   ├── api/         # REST API layer
@@ -66,10 +66,10 @@ pytest
 pytest --cov=server
 
 # Type checking
-mypy server
+mypy src
 
 # Linting
-ruff check server
+ruff check src
 ```
 
 ## License

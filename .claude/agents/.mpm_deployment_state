@@ -1,11 +1,16 @@
 {
-  "deployment_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "last_check_time": 1765157543.689583,
+  "deployment_hash": "a97920c66307d9d8cb67ede84bcdc982dd5460f3ba3b79f7534e86dd5aa7b6b1",
+  "last_check_time": 1767013128.498566,
   "last_check_results": {
     "agents": {},
     "summary": {
-      "total_agents": 0
+      "total_agents": 21,
+      "agents_with_deps": 0,
+      "missing_python": [],
+      "missing_system": [],
+      "satisfied_python": [],
+      "satisfied_system": []
     }
   },
-  "agent_count": 0
+  "agent_count": 21
 }

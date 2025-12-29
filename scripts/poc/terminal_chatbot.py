@@ -877,9 +877,9 @@ async def run_chatbot(provider: str = "openrouter"):
     ))
 
     # Initialize LLM
-    api_key = os.getenv("TERMPILOT_OPENROUTER_API_KEY")
+    api_key = os.getenv("TERMINATOR_OPENROUTER_API_KEY")
     if not api_key:
-        console.print("[red]Error: TERMPILOT_OPENROUTER_API_KEY not set[/red]")
+        console.print("[red]Error: TERMINATOR_OPENROUTER_API_KEY not set[/red]")
         console.print("Please set it in .env.local or .env")
         return
 

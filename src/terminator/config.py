@@ -6,12 +6,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings.
 
-    Loads configuration from environment variables with TERMPILOT_ prefix.
+    Loads configuration from environment variables with TERMINATOR_ prefix.
     Also loads from .env.local and .env files.
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="TERMPILOT_",
+        env_prefix="TERMINATOR_",
         env_file=(".env.local", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",

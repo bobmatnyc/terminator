@@ -1,7 +1,7 @@
-"""Pytest fixtures for TermPilot tests."""
+"""Pytest fixtures for Terminator tests."""
 import pytest
-from termpilot.config import Settings
-from termpilot.container import Container
+from terminator.config import Settings
+from terminator.container import Container
 
 
 @pytest.fixture
@@ -9,7 +9,7 @@ def settings() -> Settings:
     """Provide test settings."""
     # Create test settings with mock API key
     import os
-    os.environ["TERMPILOT_OPENROUTER_API_KEY"] = "test-key"
+    os.environ["TERMINATOR_OPENROUTER_API_KEY"] = "test-key"
     return Settings()
 
 

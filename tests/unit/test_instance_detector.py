@@ -3,13 +3,13 @@
 import pytest
 from unittest.mock import AsyncMock, Mock
 
-from termpilot.adapters.protocols import (
+from terminator.adapters.protocols import (
     InstanceType,
     UnifiedSession,
     TerminalType,
     SessionState,
 )
-from termpilot.services.instance_detector import (
+from terminator.services.instance_detector import (
     InstanceDetector,
     DetectionPattern,
     DEFAULT_DETECTION_PATTERNS,

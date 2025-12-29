@@ -12,7 +12,7 @@ from rich.table import Table
 from ..container import get_container
 
 app = typer.Typer(
-    name="termpilot",
+    name="terminator",
     help="Remote terminal control system with LLM integration",
     no_args_is_help=False,  # Allow running without args for chat
 )
@@ -22,7 +22,7 @@ console = Console()
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
-    """TermPilot - Interactive terminal control with LLM.
+    """Terminator - Interactive terminal control with LLM.
 
     Run without arguments to start interactive chat mode.
     """
@@ -41,9 +41,9 @@ async def run_chat():
     """Run the interactive chatbot."""
     console.print(
         Panel.fit(
-            "[bold green]TermPilot - Terminal Chatbot[/bold green]\n"
+            "[bold green]Terminator - Terminal Chatbot[/bold green]\n"
             "[dim]LLM-powered terminal control assistant[/dim]",
-            title="TermPilot",
+            title="Terminator",
         )
     )
 
@@ -53,7 +53,7 @@ async def run_chat():
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         console.print(
-            "\nPlease ensure TERMPILOT_OPENROUTER_API_KEY is set in environment or .env file"
+            "\nPlease ensure TERMINATOR_OPENROUTER_API_KEY is set in environment or .env file"
         )
         raise typer.Exit(1)
 

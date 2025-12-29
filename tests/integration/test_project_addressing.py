@@ -5,18 +5,18 @@ Tests the full flow from CLI/chatbot -> TerminalService -> ProjectRegistry -> se
 
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
-from termpilot.adapters.protocols import (
+from terminator.adapters.protocols import (
     UnifiedSession,
     TerminalType,
     SessionState,
     CommandResult,
     InstanceType,
 )
-from termpilot.services.terminal import TerminalService
-from termpilot.services.project_registry import ProjectRegistry
-from termpilot.services.instance_detector import InstanceDetector
-from termpilot.adapters.iterm2 import ITerm2Adapter
-from termpilot.adapters.tmux import TmuxAdapter
+from terminator.services.terminal import TerminalService
+from terminator.services.project_registry import ProjectRegistry
+from terminator.services.instance_detector import InstanceDetector
+from terminator.adapters.iterm2 import ITerm2Adapter
+from terminator.adapters.tmux import TmuxAdapter
 
 
 @pytest.fixture
@@ -349,8 +349,8 @@ class TestChatbotIntegration:
         self, terminal_service: TerminalService
     ):
         """Test that chatbot list_sessions tool includes @project addresses."""
-        from termpilot.chat.chatbot import TerminalChatbot
-        from termpilot.services.llm import LLMService
+        from terminator.chat.chatbot import TerminalChatbot
+        from terminator.services.llm import LLMService
 
         # Create mock LLM service
         llm_service = Mock(spec=LLMService)
@@ -364,7 +364,7 @@ class TestChatbotIntegration:
         await terminal_service.list_all_sessions()
 
         # Execute list_sessions tool
-        from termpilot.services.llm import ToolCall
+        from terminator.services.llm import ToolCall
 
         tool_call = ToolCall(id="test", name="list_sessions", arguments={})
         result_json = await chatbot.execute_tool(tool_call)

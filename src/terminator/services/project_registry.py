@@ -33,7 +33,7 @@ class ProjectRegistry:
     Features:
     - Automatic project name extraction from CWD
     - Numbered instances for multiple sessions per project
-    - Persistent storage to ~/.termpilot/projects.json
+    - Persistent storage to ~/.terminator/projects.json
     - Address resolution with fallback to primary session
     """
 
@@ -41,10 +41,10 @@ class ProjectRegistry:
         """Initialize project registry.
 
         Args:
-            registry_path: Path to registry file (defaults to ~/.termpilot/projects.json)
+            registry_path: Path to registry file (defaults to ~/.terminator/projects.json)
         """
         if registry_path is None:
-            registry_path = Path.home() / ".termpilot" / "projects.json"
+            registry_path = Path.home() / ".terminator" / "projects.json"
         self._registry_path = registry_path
         self._registry: dict[str, list[ProjectSession]] = {}
         self._session_to_project: dict[str, str] = {}
