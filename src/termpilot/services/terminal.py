@@ -10,6 +10,8 @@ from ..adapters.protocols import (
 )
 from ..adapters.iterm2 import ITerm2Adapter
 from ..adapters.tmux import TmuxAdapter
+from .project_registry import ProjectRegistry
+from .instance_detector import InstanceDetector
 
 
 class TerminalService:
@@ -18,17 +20,30 @@ class TerminalService:
     Manages multiple terminal adapters (iTerm2, tmux) through a unified interface.
     Provides service-level operations like listing all sessions, sending commands,
     and monitoring session status.
+
+    Integrates ProjectRegistry for @project addressing and InstanceDetector for
+    automatic detection of Claude Code, Auggie, Python, Node, and shell sessions.
     """
 
-    def __init__(self, iterm2_adapter: ITerm2Adapter, tmux_adapter: TmuxAdapter):
+    def __init__(
+        self,
+        iterm2_adapter: ITerm2Adapter,
+        tmux_adapter: TmuxAdapter,
+        project_registry: Optional[ProjectRegistry] = None,
+        instance_detector: Optional[InstanceDetector] = None,
+    ):
         """Initialize terminal service.
 
         Args:
             iterm2_adapter: iTerm2 adapter instance
             tmux_adapter: Tmux adapter instance
+            project_registry: Project registry for @project addressing
+            instance_detector: Instance detector for automatic type detection
         """
         self.iterm2 = iterm2_adapter
         self.tmux = tmux_adapter
+        self.project_registry = project_registry or ProjectRegistry()
+        self.instance_detector = instance_detector or InstanceDetector()
         self._adapters: dict[str, ITerminalAdapter] = {}
         self._sessions_cache: dict[str, UnifiedSession] = {}
 
@@ -61,8 +76,10 @@ class TerminalService:
     async def list_all_sessions(self) -> list[UnifiedSession]:
         """List all sessions from all connected backends.
 
+        Enriches sessions with instance type detection and registers with ProjectRegistry.
+
         Returns:
-            Combined list of sessions from all backends
+            Combined list of sessions from all backends with instance types detected
         """
         sessions = []
 
@@ -80,23 +97,54 @@ class TerminalService:
             for s in iterm2_sessions:
                 self._sessions_cache[s.id] = s
 
+        # Detect instance types for all sessions
+        await self._detect_instance_types(sessions)
+
+        # Register all sessions with project registry
+        await self.project_registry.refresh_all(sessions)
+
         return sessions
+
+    async def _detect_instance_types(self, sessions: list[UnifiedSession]) -> None:
+        """Detect and set instance types for all sessions.
+
+        Args:
+            sessions: List of sessions to enrich with instance types
+        """
+        for session in sessions:
+            adapter = self._get_adapter_for_session(session.id)
+            if adapter:
+                try:
+                    instance_type = await self.instance_detector.detect_from_session(
+                        session, adapter, lines=100
+                    )
+                    session.instance_type = instance_type
+                except Exception:
+                    # Keep default UNKNOWN on detection failure
+                    pass
 
     async def get_session_output(self, session_id: str, lines: int = 50) -> str:
         """Get recent output from a session.
 
+        Supports @project addressing for session lookup.
+
         Args:
-            session_id: Target session ID
+            session_id: Target session ID or @project address
             lines: Number of lines to retrieve
 
         Returns:
             Recent terminal output
         """
-        adapter = self._get_adapter_for_session(session_id)
+        # Resolve @project address if needed
+        resolved_id = await self._resolve_session_id(session_id)
+        if not resolved_id:
+            return f"Session not found: {session_id}"
+
+        adapter = self._get_adapter_for_session(resolved_id)
         if not adapter:
             return "Session not found or backend not available"
 
-        return await adapter.get_session_output(session_id, lines)
+        return await adapter.get_session_output(resolved_id, lines)
 
     async def send_command(
         self,
@@ -107,8 +155,10 @@ class TerminalService:
     ) -> CommandResult:
         """Send a command to a session.
 
+        Supports @project addressing for session lookup.
+
         Args:
-            session_id: Target session ID
+            session_id: Target session ID or @project address
             command: Command to execute
             wait_for_completion: Whether to wait for completion
             timeout: Maximum wait time
@@ -116,41 +166,71 @@ class TerminalService:
         Returns:
             Command execution result
         """
-        adapter = self._get_adapter_for_session(session_id)
+        # Resolve @project address if needed
+        resolved_id = await self._resolve_session_id(session_id)
+        if not resolved_id:
+            return CommandResult(
+                False,
+                f"Session not found: {session_id}",
+                SessionState.UNKNOWN,
+                0.0,
+            )
+
+        adapter = self._get_adapter_for_session(resolved_id)
         if not adapter:
             return CommandResult(
-                False, "Session not found or backend not available", SessionState.UNKNOWN, 0
+                False, "Session not found or backend not available", SessionState.UNKNOWN, 0.0
             )
 
         return await adapter.send_command(
-            session_id, command, wait_for_completion, timeout
+            resolved_id, command, wait_for_completion, timeout
         )
 
     async def detect_state(self, session_id: str) -> SessionState:
         """Detect whether a session is idle or running.
 
+        Supports @project addressing for session lookup.
+
         Args:
-            session_id: Target session ID
+            session_id: Target session ID or @project address
 
         Returns:
             Current session state
         """
-        adapter = self._get_adapter_for_session(session_id)
+        # Resolve @project address if needed
+        resolved_id = await self._resolve_session_id(session_id)
+        if not resolved_id:
+            return SessionState.UNKNOWN
+
+        adapter = self._get_adapter_for_session(resolved_id)
         if not adapter:
             return SessionState.UNKNOWN
 
-        return await adapter.detect_state(session_id)
+        return await adapter.detect_state(resolved_id)
 
     async def get_session_status(self, session_id: str) -> dict:
         """Get comprehensive status of a session with analysis.
 
+        Supports @project addressing for session lookup.
+
         Args:
-            session_id: Target session ID
+            session_id: Target session ID or @project address
 
         Returns:
             Dict with status information and screen digest
         """
-        adapter = self._get_adapter_for_session(session_id)
+        # Resolve @project address if needed
+        resolved_id = await self._resolve_session_id(session_id)
+        if not resolved_id:
+            return {
+                "is_working": False,
+                "status": "unknown",
+                "screen_summary": f"Session not found: {session_id}",
+                "last_lines": [],
+                "indicators": {},
+            }
+
+        adapter = self._get_adapter_for_session(resolved_id)
         if not adapter:
             return {
                 "is_working": False,
@@ -160,7 +240,23 @@ class TerminalService:
                 "indicators": {},
             }
 
-        return await adapter.get_session_status(session_id)
+        return await adapter.get_session_status(resolved_id)
+
+    async def _resolve_session_id(self, session_id: str) -> Optional[str]:
+        """Resolve @project address to session ID.
+
+        Args:
+            session_id: Session ID or @project address
+
+        Returns:
+            Resolved session ID or None if not found
+        """
+        # If it's an @project address, resolve it
+        if session_id.startswith("@"):
+            return await self.project_registry.resolve(session_id)
+
+        # Otherwise, return as-is (already a session ID)
+        return session_id
 
     def _get_adapter_for_session(self, session_id: str) -> Optional[ITerminalAdapter]:
         """Get the appropriate adapter for a session ID.

@@ -13,13 +13,13 @@ TERMINAL_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_session_state",
-            "description": "Get the current state of a terminal session (idle or running) and its recent output",
+            "description": "Get the current state of a terminal session (idle or running) and its recent output. Supports @project addressing.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "The session ID to check",
+                        "description": "The session ID or @project address to check",
                     }
                 },
                 "required": ["session_id"],
@@ -30,13 +30,13 @@ TERMINAL_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_session_status",
-            "description": "Get a status digest of a terminal session - samples the current screen, determines if the session is working or idle, and provides a summary of what's visible. Use this when the user asks 'What's happening?', 'Is it still working?', 'What's it doing?', or 'Check on [session]'.",
+            "description": "Get a status digest of a terminal session - samples the current screen, determines if the session is working or idle, and provides a summary of what's visible. Use this when the user asks 'What's happening?', 'Is it still working?', 'What's it doing?', or 'Check on [session]'. Supports @project addressing.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "The session ID to check",
+                        "description": "The session ID or @project address to check",
                     }
                 },
                 "required": ["session_id"],
@@ -47,13 +47,13 @@ TERMINAL_TOOLS = [
         "type": "function",
         "function": {
             "name": "send_command",
-            "description": "Send text/message to a terminal session. For Claude Code or REPL sessions, this sends your message as a chat prompt. For shell sessions, this executes a command.",
+            "description": "Send text/message to a terminal session. For Claude Code or REPL sessions, this sends your message as a chat prompt. For shell sessions, this executes a command. Supports @project addressing (e.g., @mcp-ticketer or @mcp-ticketer:2).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "The session ID to send the message/command to",
+                        "description": "The session ID or @project address (e.g., @terminator, @mcp-ticketer:2)",
                     },
                     "command": {
                         "type": "string",
@@ -73,13 +73,13 @@ TERMINAL_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_session_output",
-            "description": "Get the recent output/content from a terminal session",
+            "description": "Get the recent output/content from a terminal session. Supports @project addressing.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "The session ID to get output from",
+                        "description": "The session ID or @project address to get output from",
                     },
                     "lines": {
                         "type": "integer",
@@ -97,16 +97,25 @@ SYSTEM_PROMPT = """You are TermPilot, an AI assistant that helps users communica
 
 You can:
 1. List all available terminal sessions (iTerm2 and tmux)
-2. Send messages or prompts to any session
+2. Send messages or prompts to any session using @project addressing
 3. Read the current output/response from any session
 4. Monitor sessions for responses
 5. Get intelligent status digests (use get_session_status to check if session is working/idle)
 
+**Project Addressing**:
+Sessions are addressable by @project name (extracted from working directory):
+- @mcp-ticketer - Primary session in mcp-ticketer project
+- @mcp-ticketer:2 - Second session in same project
+- @terminator - Primary session in terminator project
+
+Sessions have detected instance types (claude-code, auggie, python, node, shell).
+
 When the user asks you to communicate with a session:
 1. List sessions if needed to find the right one
-2. Send the user's message to that session (just the natural text, no special formatting)
-3. Wait briefly and read the response
-4. Summarize or relay the response back to the user
+2. Use @project addresses when available (more user-friendly than raw session IDs)
+3. Send the user's message to that session (just the natural text, no special formatting)
+4. Wait briefly and read the response
+5. Summarize or relay the response back to the user
 
 When the user asks about session status (e.g., "What's happening?", "Is it still working?", "What's [session] doing?", "Check on [session]"):
 1. Use get_session_status to get a comprehensive digest
@@ -116,7 +125,8 @@ When the user asks about session status (e.g., "What's happening?", "Is it still
 
 You're essentially a messenger between the user and their terminal sessions. Keep your communication natural and conversational. When sending to Claude Code sessions, just send the plain text message - no need for shell command syntax.
 
-Session IDs:
+Session IDs (prefer @project addresses when available):
+- Project addresses: "@project" or "@project:N"
 - tmux: "tmux:session_name:window_index:pane_index"
 - iTerm2: "iterm2:session_uuid"
 

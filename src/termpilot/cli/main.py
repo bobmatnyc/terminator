@@ -79,23 +79,34 @@ async def run_chat():
         console.print("[red]No terminal backends available![/red]")
         raise typer.Exit(1)
 
-    # Show available sessions
+    # Show available sessions with @project addresses
     sessions = await terminal_service.list_all_sessions()
     if sessions:
+        # Build project address map
+        project_registry = terminal_service.project_registry
+        projects = await project_registry.list_projects()
+        session_to_address: dict[str, str] = {}
+        for project_name, project_sessions in projects.items():
+            for ps in project_sessions:
+                session_to_address[ps.session_id] = ps.address
+
         table = Table(title="Available Sessions")
-        table.add_column("ID", style="cyan", no_wrap=True, max_width=40)
-        table.add_column("Name", style="green")
-        table.add_column("Type", style="yellow")
+        table.add_column("Address", style="cyan bold", no_wrap=True)
+        table.add_column("Instance", style="magenta")
+        table.add_column("Project", style="green")
 
         for s in sessions[:10]:  # Show first 10
-            table.add_row(
-                s.id[:40] + "..." if len(s.id) > 40 else s.id,
-                s.name,
-                s.terminal_type.value,
-            )
+            # Get project address
+            address = session_to_address.get(s.id, s.id[:20] + "...")
+            instance_display = f"({s.instance_type.value})"
+
+            # Extract project name from CWD
+            project_name = s.cwd.split("/")[-1] if s.cwd else s.name
+
+            table.add_row(address, instance_display, project_name)
 
         if len(sessions) > 10:
-            table.add_row("...", f"({len(sessions) - 10} more)", "...")
+            table.add_row("...", "...", f"({len(sessions) - 10} more)")
 
         console.print(table)
     else:
@@ -148,7 +159,7 @@ def sessions():
 
 
 async def run_sessions():
-    """List all terminal sessions."""
+    """List all terminal sessions with @project addresses and instance types."""
     container = get_container()
     terminal_service = container.get_terminal_service()
 
@@ -165,17 +176,37 @@ async def run_sessions():
         console.print("[yellow]No sessions found[/yellow]")
         return
 
+    # Build project address map
+    project_registry = terminal_service.project_registry
+    projects = await project_registry.list_projects()
+    session_to_address: dict[str, str] = {}
+    for project_name, project_sessions in projects.items():
+        for ps in project_sessions:
+            session_to_address[ps.session_id] = ps.address
+
     table = Table(title="Terminal Sessions")
-    table.add_column("ID", style="cyan", no_wrap=True, max_width=50)
-    table.add_column("Name", style="green")
-    table.add_column("Type", style="yellow")
-    table.add_column("CWD", style="dim")
+    table.add_column("Address", style="cyan bold", no_wrap=True)
+    table.add_column("Instance", style="magenta")
+    table.add_column("Session ID", style="dim", no_wrap=True, max_width=35)
+    table.add_column("CWD", style="green")
 
     for s in sessions:
+        # Get project address or use truncated session ID
+        address = session_to_address.get(s.id, "")
+        if not address:
+            # No project address, show partial session ID
+            address = s.id[:20] + "..." if len(s.id) > 20 else s.id
+
+        # Format instance type with parentheses
+        instance_display = f"({s.instance_type.value})" if s.instance_type else "(unknown)"
+
+        # Truncate session ID for display
+        session_id_display = s.id[:35] + "..." if len(s.id) > 35 else s.id
+
         table.add_row(
-            s.id[:50] + "..." if len(s.id) > 50 else s.id,
-            s.name,
-            s.terminal_type.value,
+            address,
+            instance_display,
+            session_id_display,
             s.cwd or "",
         )
 

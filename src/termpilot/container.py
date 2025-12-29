@@ -73,6 +73,8 @@ class Container:
             self._terminal_service = TerminalService(
                 iterm2_adapter=self.get_iterm2_adapter(),
                 tmux_adapter=self.get_tmux_adapter(),
+                project_registry=self.get_project_registry(),
+                instance_detector=self.get_instance_detector(),
             )
         return self._terminal_service
 

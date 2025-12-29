@@ -42,13 +42,27 @@ class TerminalChatbot:
         try:
             if name == "list_sessions":
                 sessions = await self.terminal.list_all_sessions()
+
+                # Build project address map
+                project_registry = self.terminal.project_registry
+                projects = await project_registry.list_projects()
+                session_to_address: dict[str, str] = {}
+                for project_name, project_sessions in projects.items():
+                    for ps in project_sessions:
+                        session_to_address[ps.session_id] = ps.address
+
                 result = []
                 for s in sessions:
+                    # Get project address if available
+                    address = session_to_address.get(s.id, "")
+
                     result.append(
                         {
                             "id": s.id,
+                            "address": address,  # @project or @project:N
                             "name": s.name,
                             "type": s.terminal_type.value,
+                            "instance_type": s.instance_type.value,
                             "cwd": s.cwd,
                         }
                     )
