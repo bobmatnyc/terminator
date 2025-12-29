@@ -266,32 +266,41 @@ class ChatInterface:
 
         elif cmd == "/sessions":
             # List sessions inline
-            sessions = await self.terminal.list_all_sessions()
-            if not sessions:
-                msg = "No sessions found."
-            else:
-                # Build project address map
-                project_registry = self.terminal.project_registry
-                projects = await project_registry.list_projects()
-                session_to_address: dict[str, str] = {}
-                for project_name, project_sessions in projects.items():
-                    for ps in project_sessions:
-                        session_to_address[ps.session_id] = ps.address
+            try:
+                sessions = await self.terminal.list_all_sessions()
+                if not sessions:
+                    msg = "No sessions found."
+                else:
+                    # Build project address map
+                    project_registry = self.terminal.project_registry
+                    projects = await project_registry.list_projects()
+                    session_to_address: dict[str, str] = {}
+                    for project_name, project_sessions in projects.items():
+                        for ps in project_sessions:
+                            session_to_address[ps.session_id] = ps.address
 
-                session_lines = ["Available sessions:"]
-                for s in sessions[:10]:
-                    address = session_to_address.get(s.id, s.id[:20] + "...")
-                    instance = s.instance_type.value
-                    session_lines.append(f"  • {address} ({instance})")
+                    session_lines = ["Available sessions:"]
+                    for s in sessions[:10]:
+                        address = session_to_address.get(s.id, s.id[:20] + "...")
+                        instance = s.instance_type.value if s.instance_type else "unknown"
+                        session_lines.append(f"  • {address} ({instance})")
 
-                if len(sessions) > 10:
-                    session_lines.append(f"  ... and {len(sessions) - 10} more")
+                    if len(sessions) > 10:
+                        session_lines.append(f"  ... and {len(sessions) - 10} more")
 
-                msg = "\n".join(session_lines)
+                    msg = "\n".join(session_lines)
 
-            self.chat_history.append(
-                ChatMessage(role="tool", content=msg, metadata={"status": "success"})
-            )
+                self.chat_history.append(
+                    ChatMessage(role="tool", content=msg, metadata={"status": "success"})
+                )
+            except Exception as e:
+                self.chat_history.append(
+                    ChatMessage(
+                        role="tool",
+                        content=f"Error listing sessions: {e}",
+                        metadata={"status": "error"},
+                    )
+                )
             self._refresh_display()
 
         elif cmd == "/focus":
