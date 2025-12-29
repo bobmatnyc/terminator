@@ -10,8 +10,10 @@ from .adapters.iterm2 import ITerm2Adapter
 from .adapters.tmux import TmuxAdapter
 from .chat.chatbot import TerminalChatbot
 from .config import Settings, get_settings
+from .services.instance_detector import InstanceDetector
 from .services.llm import LLMService
 from .services.terminal import TerminalService
+from .services.project_registry import ProjectRegistry
 
 
 class Container:
@@ -33,6 +35,8 @@ class Container:
         self._terminal_service: Optional[TerminalService] = None
         self._llm_service: Optional[LLMService] = None
         self._chatbot: Optional[TerminalChatbot] = None
+        self._project_registry: Optional[ProjectRegistry] = None
+        self._instance_detector: Optional[InstanceDetector] = None
 
     @property
     def settings(self) -> Settings:
@@ -98,6 +102,26 @@ class Container:
             )
         return self._chatbot
 
+    def get_project_registry(self) -> ProjectRegistry:
+        """Get or create project registry.
+
+        Returns:
+            ProjectRegistry instance (singleton)
+        """
+        if self._project_registry is None:
+            self._project_registry = ProjectRegistry()
+        return self._project_registry
+
+    def get_instance_detector(self) -> InstanceDetector:
+        """Get or create instance detector.
+
+        Returns:
+            InstanceDetector instance (singleton)
+        """
+        if self._instance_detector is None:
+            self._instance_detector = InstanceDetector()
+        return self._instance_detector
+
     def reset(self) -> None:
         """Reset all cached instances.
 
@@ -108,6 +132,8 @@ class Container:
         self._terminal_service = None
         self._llm_service = None
         self._chatbot = None
+        self._project_registry = None
+        self._instance_detector = None
 
 
 # Global container instance for CLI usage

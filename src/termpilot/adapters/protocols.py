@@ -21,6 +21,17 @@ class SessionState(Enum):
     UNKNOWN = "unknown"
 
 
+class InstanceType(str, Enum):
+    """Type of REPL or shell running in a session."""
+
+    CLAUDE_CODE = "claude-code"
+    AUGGIE = "auggie"
+    PYTHON = "python"
+    NODE = "node"
+    SHELL = "shell"
+    UNKNOWN = "unknown"
+
+
 @dataclass
 class UnifiedSession:
     """Unified session representation across terminal types."""
@@ -34,6 +45,8 @@ class UnifiedSession:
     # For tmux: window_index and pane_index
     window_index: int = 0
     pane_index: int = 0
+    # Instance type detection
+    instance_type: InstanceType = InstanceType.UNKNOWN
 
 
 @dataclass
