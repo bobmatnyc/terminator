@@ -124,12 +124,23 @@ class SessionManagerTUI:
 
             # If ESC, check for arrow key sequence
             if key == "\x1b":
-                # Check if more characters available (with short timeout)
-                if select.select([sys.stdin], [], [], 0.01)[0]:
-                    # Read next 2 characters for arrow key sequence
-                    next_chars = sys.stdin.read(2)
-                    # Return full escape sequence
-                    return key + next_chars
+                # Use longer timeout (50ms) to ensure full sequence is available
+                # This handles slower terminals and high system load
+                if select.select([sys.stdin], [], [], 0.05)[0]:
+                    # Read next character - should be '['
+                    next_char = sys.stdin.read(1)
+                    if next_char == "[":
+                        # Read the final character (A, B, C, D for arrows)
+                        if select.select([sys.stdin], [], [], 0.05)[0]:
+                            final_char = sys.stdin.read(1)
+                            # Return full escape sequence
+                            return key + next_char + final_char
+                        else:
+                            # Only got ESC[, return what we have
+                            return key + next_char
+                    else:
+                        # Not an arrow key sequence, return ESC + whatever we got
+                        return key + next_char
 
             return key
         return ""
