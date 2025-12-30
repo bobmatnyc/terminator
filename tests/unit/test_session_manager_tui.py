@@ -73,7 +73,9 @@ class TestSessionManagerTUI:
         assert tui.running is True
 
     @pytest.mark.asyncio
-    async def test_refresh_sessions(self, mock_terminal_service, mock_session_monitor, sample_sessions):
+    async def test_refresh_sessions(
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
+    ):
         """Test session list refresh."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
         mock_terminal_service.project_registry.list_projects.return_value = {
@@ -107,7 +109,9 @@ class TestSessionManagerTUI:
         assert tui.selected_index == 1
 
     @pytest.mark.asyncio
-    async def test_refresh_sessions_empty_list(self, mock_terminal_service, mock_session_monitor):
+    async def test_refresh_sessions_empty_list(
+        self, mock_terminal_service, mock_session_monitor
+    ):
         """Test refresh with no sessions."""
         mock_terminal_service.list_all_sessions.return_value = []
 
@@ -119,7 +123,9 @@ class TestSessionManagerTUI:
         assert tui.selected_index == 0
 
     @pytest.mark.asyncio
-    async def test_render_with_sessions(self, mock_terminal_service, mock_session_monitor, sample_sessions):
+    async def test_render_with_sessions(
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
+    ):
         """Test rendering with sessions."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
@@ -131,7 +137,9 @@ class TestSessionManagerTUI:
         assert layout is not None
 
     @pytest.mark.asyncio
-    async def test_render_with_no_sessions(self, mock_terminal_service, mock_session_monitor):
+    async def test_render_with_no_sessions(
+        self, mock_terminal_service, mock_session_monitor
+    ):
         """Test rendering with no sessions."""
         mock_terminal_service.list_all_sessions.return_value = []
 
@@ -143,7 +151,9 @@ class TestSessionManagerTUI:
         assert layout is not None
 
     @pytest.mark.asyncio
-    async def test_render_with_message(self, mock_terminal_service, mock_session_monitor, sample_sessions):
+    async def test_render_with_message(
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
+    ):
         """Test rendering with a status message."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
@@ -163,7 +173,9 @@ class TestSessionManagerTUIIntegration:
     """Integration tests that verify correct interaction patterns."""
 
     @pytest.mark.asyncio
-    async def test_kill_session_workflow(self, mock_terminal_service, mock_session_monitor, sample_sessions):
+    async def test_kill_session_workflow(
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
+    ):
         """Test the kill session workflow (without actual terminal interaction)."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
         mock_terminal_service.kill_session.return_value = True
@@ -182,7 +194,9 @@ class TestSessionManagerTUIIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_navigation_bounds(self, mock_terminal_service, mock_session_monitor, sample_sessions):
+    async def test_navigation_bounds(
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
+    ):
         """Test that navigation stays within bounds."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
@@ -221,3 +235,27 @@ class TestSessionManagerTUIIntegration:
 
         # Verify session is iTerm2 (attach should not work)
         assert not tui.sessions[0].id.startswith("tmux:")
+
+    @pytest.mark.asyncio
+    async def test_arrow_key_navigation(
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
+    ):
+        """Test arrow key navigation handles escape sequences correctly."""
+        mock_terminal_service.list_all_sessions.return_value = sample_sessions
+
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
+        await tui.refresh_sessions()
+
+        # Test up arrow (escape sequence: \x1b[A)
+        tui.selected_index = 1
+        await tui._handle_key("\x1b[A")
+        assert tui.selected_index == 0  # Should move up
+
+        # Test down arrow (escape sequence: \x1b[B)
+        await tui._handle_key("\x1b[B")
+        assert tui.selected_index == 1  # Should move down
+
+        # Test ESC alone should quit
+        tui.running = True
+        await tui._handle_key("\x1b")
+        assert tui.running is False  # Should quit

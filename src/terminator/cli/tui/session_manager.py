@@ -113,12 +113,25 @@ class SessionManagerTUI:
     def _get_key_nonblocking(self) -> str:
         """Get a key press without blocking (with 50ms timeout).
 
+        Handles escape sequences (arrow keys) by reading full sequence.
+
         Returns:
-            Key character or empty string if no key pressed
+            Key character or full escape sequence, or empty string if no key pressed
         """
         # Check if stdin has data available (50ms timeout)
         if select.select([sys.stdin], [], [], 0.05)[0]:
-            return sys.stdin.read(1)
+            key = sys.stdin.read(1)
+
+            # If ESC, check for arrow key sequence
+            if key == "\x1b":
+                # Check if more characters available (with short timeout)
+                if select.select([sys.stdin], [], [], 0.01)[0]:
+                    # Read next 2 characters for arrow key sequence
+                    next_chars = sys.stdin.read(2)
+                    # Return full escape sequence
+                    return key + next_chars
+
+            return key
         return ""
 
     def _get_key(self) -> str:
@@ -133,25 +146,19 @@ class SessionManagerTUI:
         """Handle keyboard input.
 
         Args:
-            key: Key character pressed
+            key: Key character or escape sequence
         """
-        # Arrow keys (escape sequences)
-        if key == "\x1b":  # ESC
-            # Check for arrow key sequence
-            next_chars = (
-                sys.stdin.read(2) if select.select([sys.stdin], [], [], 0.01)[0] else ""
+        # Arrow keys (escape sequences) - now come as full sequences from _get_key_nonblocking
+        if key == "\x1b[A":  # Up arrow
+            self.selected_index = max(0, self.selected_index - 1)
+            self.message = ""
+        elif key == "\x1b[B":  # Down arrow
+            self.selected_index = min(
+                len(self.sessions) - 1, self.selected_index + 1
             )
-            if next_chars == "[A":  # Up arrow
-                self.selected_index = max(0, self.selected_index - 1)
-                self.message = ""
-            elif next_chars == "[B":  # Down arrow
-                self.selected_index = min(
-                    len(self.sessions) - 1, self.selected_index + 1
-                )
-                self.message = ""
-            else:
-                # Just ESC key - quit
-                self.running = False
+            self.message = ""
+        elif key == "\x1b":  # Just ESC key - quit
+            self.running = False
 
         # Navigation
         elif key in ("j", "J"):  # Down (vim-style)
