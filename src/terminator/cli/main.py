@@ -33,8 +33,8 @@ def main(ctx: typer.Context):
 
 @app.command(name="chat")
 def chat(
-    session: str | None = typer.Argument(
-        None, help="Optional session to focus (e.g., @mcp-ticketer)"
+    session: str = typer.Argument(
+        "", help="Optional session to focus (e.g., @mcp-ticketer)"
     ),
     tui: bool = typer.Option(
         True, "--tui/--simple", help="Use TUI mode (default) or simple mode"
@@ -47,7 +47,9 @@ def chat(
         terminator chat @mcp-ticketer      # Start TUI focused on session
         terminator chat --simple           # Use simple (non-TUI) mode
     """
-    asyncio.run(run_chat(initial_focus=session, use_tui=tui))
+    # Convert empty string to None for initial_focus
+    initial_focus = session if session else None
+    asyncio.run(run_chat(initial_focus=initial_focus, use_tui=tui))
 
 
 async def run_chat(initial_focus: str | None = None, use_tui: bool = True):
@@ -229,7 +231,9 @@ async def run_sessions():
             address = s.id[:20] + "..." if len(s.id) > 20 else s.id
 
         # Format instance type with parentheses
-        instance_display = f"({s.instance_type.value})" if s.instance_type else "(unknown)"
+        instance_display = (
+            f"({s.instance_type.value})" if s.instance_type else "(unknown)"
+        )
 
         # Truncate session ID for display
         session_id_display = s.id[:35] + "..." if len(s.id) > 35 else s.id
@@ -396,7 +400,9 @@ async def run_start(project_path: str, agent: str, name: str | None):
 
         # Success message
         console.print()
-        console.print(f"[green]✓[/green] Session created: [cyan bold]{project_address}[/cyan bold] ({agent})")
+        console.print(
+            f"[green]✓[/green] Session created: [cyan bold]{project_address}[/cyan bold] ({agent})"
+        )
         console.print()
 
         # Show connection instructions

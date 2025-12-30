@@ -1,13 +1,11 @@
 """Interactive chat TUI with split-pane layout for conversational session control."""
 
 import asyncio
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
 from prompt_toolkit import Application
 from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.document import Document
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import (
     Dimension,
@@ -20,10 +18,7 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.layout.controls import BufferControl
 from prompt_toolkit.styles import Style
-from prompt_toolkit.widgets import Frame, TextArea
 from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
 
 from ...chat.chatbot import TerminalChatbot
 from ...services.terminal import TerminalService
@@ -100,6 +95,10 @@ class ChatInterface:
                 result.append(("", "\n"))
                 if status == "success":
                     result.append(("fg:ansigreen", f"✓ {tool_display}"))
+                    # Show content for successful tool messages
+                    if msg.content:
+                        result.append(("", "\n"))
+                        result.append(("", msg.content))
                 elif status == "error":
                     result.append(("fg:ansired", f"✗ {tool_display}: {msg.content}"))
                 else:
@@ -132,7 +131,6 @@ class ChatInterface:
         )
 
         # Chat history pane (scrollable)
-        history_content = self._format_chat_history()
         self.history_control = FormattedTextControl(
             text=lambda: self._format_chat_history(), focusable=False
         )
@@ -282,7 +280,9 @@ class ChatInterface:
                     session_lines = ["Available sessions:"]
                     for s in sessions[:10]:
                         address = session_to_address.get(s.id, s.id[:20] + "...")
-                        instance = s.instance_type.value if s.instance_type else "unknown"
+                        instance = (
+                            s.instance_type.value if s.instance_type else "unknown"
+                        )
                         session_lines.append(f"  • {address} ({instance})")
 
                     if len(sessions) > 10:
@@ -291,7 +291,9 @@ class ChatInterface:
                     msg = "\n".join(session_lines)
 
                 self.chat_history.append(
-                    ChatMessage(role="tool", content=msg, metadata={"status": "success"})
+                    ChatMessage(
+                        role="tool", content=msg, metadata={"status": "success"}
+                    )
                 )
             except Exception as e:
                 self.chat_history.append(
