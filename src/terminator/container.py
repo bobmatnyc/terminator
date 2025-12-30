@@ -14,6 +14,7 @@ from .services.instance_detector import InstanceDetector
 from .services.llm import LLMService
 from .services.terminal import TerminalService
 from .services.project_registry import ProjectRegistry
+from .services.session_monitor import SessionMonitorService
 
 
 class Container:
@@ -37,6 +38,7 @@ class Container:
         self._chatbot: Optional[TerminalChatbot] = None
         self._project_registry: Optional[ProjectRegistry] = None
         self._instance_detector: Optional[InstanceDetector] = None
+        self._session_monitor: Optional[SessionMonitorService] = None
 
     @property
     def settings(self) -> Settings:
@@ -124,6 +126,18 @@ class Container:
             self._instance_detector = InstanceDetector()
         return self._instance_detector
 
+    def get_session_monitor(self) -> SessionMonitorService:
+        """Get or create session monitor service.
+
+        Returns:
+            SessionMonitorService instance (singleton)
+        """
+        if self._session_monitor is None:
+            self._session_monitor = SessionMonitorService(
+                terminal_service=self.get_terminal_service(),
+            )
+        return self._session_monitor
+
     def reset(self) -> None:
         """Reset all cached instances.
 
@@ -136,6 +150,7 @@ class Container:
         self._chatbot = None
         self._project_registry = None
         self._instance_detector = None
+        self._session_monitor = None
 
 
 # Global container instance for CLI usage

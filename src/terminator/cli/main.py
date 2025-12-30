@@ -311,6 +311,7 @@ async def run_manage():
 
     container = get_container()
     terminal_service = container.get_terminal_service()
+    session_monitor = container.get_session_monitor()
 
     console.print("[blue]Connecting to terminals...[/blue]")
     status = await terminal_service.connect_all()
@@ -326,7 +327,7 @@ async def run_manage():
             console.print(f"[green]✓[/green] {backend} connected")
 
     # Run TUI
-    tui = SessionManagerTUI(terminal_service)
+    tui = SessionManagerTUI(terminal_service, session_monitor)
     await tui.run()
 
 
@@ -402,7 +403,7 @@ async def run_start(project_path: str, agent: str, name: str | None):
         if backend == "tmux":
             console.print(f"[dim]Connect: tmux attach -t {project_name}[/dim]")
         else:
-            console.print(f"[dim]Session opened in iTerm2[/dim]")
+            console.print("[dim]Session opened in iTerm2[/dim]")
 
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")

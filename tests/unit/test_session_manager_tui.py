@@ -24,6 +24,17 @@ def mock_terminal_service():
 
 
 @pytest.fixture
+def mock_session_monitor():
+    """Create mock session monitor service."""
+    monitor = Mock()
+    monitor.start_monitoring = AsyncMock()
+    monitor.stop_monitoring = AsyncMock()
+    monitor.get_events = AsyncMock(return_value=[])
+    monitor.is_monitored = Mock(return_value=False)
+    return monitor
+
+
+@pytest.fixture
 def sample_sessions():
     """Create sample sessions for testing."""
     return [
@@ -50,18 +61,19 @@ class TestSessionManagerTUI:
     """Test SessionManagerTUI class."""
 
     @pytest.mark.asyncio
-    async def test_initialization(self, mock_terminal_service):
+    async def test_initialization(self, mock_terminal_service, mock_session_monitor):
         """Test TUI initialization."""
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
 
         assert tui.terminal_service == mock_terminal_service
+        assert tui.session_monitor == mock_session_monitor
         assert tui.sessions == []
         assert tui.selected_index == 0
         assert tui.session_to_address == {}
         assert tui.running is True
 
     @pytest.mark.asyncio
-    async def test_refresh_sessions(self, mock_terminal_service, sample_sessions):
+    async def test_refresh_sessions(self, mock_terminal_service, mock_session_monitor, sample_sessions):
         """Test session list refresh."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
         mock_terminal_service.project_registry.list_projects.return_value = {
@@ -71,7 +83,7 @@ class TestSessionManagerTUI:
             ]
         }
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         assert len(tui.sessions) == 2
@@ -82,12 +94,12 @@ class TestSessionManagerTUI:
 
     @pytest.mark.asyncio
     async def test_refresh_sessions_clamps_index(
-        self, mock_terminal_service, sample_sessions
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
     ):
         """Test that selected index is clamped after refresh."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         tui.selected_index = 5  # Out of bounds
         await tui.refresh_sessions()
 
@@ -95,11 +107,11 @@ class TestSessionManagerTUI:
         assert tui.selected_index == 1
 
     @pytest.mark.asyncio
-    async def test_refresh_sessions_empty_list(self, mock_terminal_service):
+    async def test_refresh_sessions_empty_list(self, mock_terminal_service, mock_session_monitor):
         """Test refresh with no sessions."""
         mock_terminal_service.list_all_sessions.return_value = []
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         tui.selected_index = 5
         await tui.refresh_sessions()
 
@@ -107,11 +119,11 @@ class TestSessionManagerTUI:
         assert tui.selected_index == 0
 
     @pytest.mark.asyncio
-    async def test_render_with_sessions(self, mock_terminal_service, sample_sessions):
+    async def test_render_with_sessions(self, mock_terminal_service, mock_session_monitor, sample_sessions):
         """Test rendering with sessions."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         # Test rendering (should not raise exception)
@@ -119,11 +131,11 @@ class TestSessionManagerTUI:
         assert layout is not None
 
     @pytest.mark.asyncio
-    async def test_render_with_no_sessions(self, mock_terminal_service):
+    async def test_render_with_no_sessions(self, mock_terminal_service, mock_session_monitor):
         """Test rendering with no sessions."""
         mock_terminal_service.list_all_sessions.return_value = []
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         # Test rendering (should not raise exception)
@@ -131,11 +143,11 @@ class TestSessionManagerTUI:
         assert layout is not None
 
     @pytest.mark.asyncio
-    async def test_render_with_message(self, mock_terminal_service, sample_sessions):
+    async def test_render_with_message(self, mock_terminal_service, mock_session_monitor, sample_sessions):
         """Test rendering with a status message."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         # Set a message
@@ -151,12 +163,12 @@ class TestSessionManagerTUIIntegration:
     """Integration tests that verify correct interaction patterns."""
 
     @pytest.mark.asyncio
-    async def test_kill_session_workflow(self, mock_terminal_service, sample_sessions):
+    async def test_kill_session_workflow(self, mock_terminal_service, mock_session_monitor, sample_sessions):
         """Test the kill session workflow (without actual terminal interaction)."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
         mock_terminal_service.kill_session.return_value = True
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         # Simulate selecting first session
@@ -170,11 +182,11 @@ class TestSessionManagerTUIIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_navigation_bounds(self, mock_terminal_service, sample_sessions):
+    async def test_navigation_bounds(self, mock_terminal_service, mock_session_monitor, sample_sessions):
         """Test that navigation stays within bounds."""
         mock_terminal_service.list_all_sessions.return_value = sample_sessions
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         # Test lower bound
@@ -189,7 +201,7 @@ class TestSessionManagerTUIIntegration:
 
     @pytest.mark.asyncio
     async def test_attach_session_non_tmux(
-        self, mock_terminal_service, sample_sessions
+        self, mock_terminal_service, mock_session_monitor, sample_sessions
     ):
         """Test that attach only works for tmux sessions."""
         # Create iTerm2 session
@@ -204,7 +216,7 @@ class TestSessionManagerTUIIntegration:
 
         mock_terminal_service.list_all_sessions.return_value = [iterm_session]
 
-        tui = SessionManagerTUI(mock_terminal_service)
+        tui = SessionManagerTUI(mock_terminal_service, mock_session_monitor)
         await tui.refresh_sessions()
 
         # Verify session is iTerm2 (attach should not work)
