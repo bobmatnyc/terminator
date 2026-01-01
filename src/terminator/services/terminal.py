@@ -1,6 +1,6 @@
 """Terminal service for unified session management."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from ..adapters.protocols import (
     CommandResult,
@@ -50,9 +50,15 @@ class TerminalService:
     async def connect_all(self) -> dict[str, bool]:
         """Connect to all available terminal backends.
 
+        Logs errors with context to aid troubleshooting while continuing
+        to attempt all backends.
+
         Returns:
             Dict mapping backend name to connection status
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
         status = {"tmux": False, "iterm2": False}
 
         # Connect to tmux
@@ -60,16 +66,22 @@ class TerminalService:
             if await self.tmux.connect():
                 status["tmux"] = True
                 self._adapters["tmux"] = self.tmux
-        except Exception:
-            pass
+            else:
+                logger.debug("Tmux connection returned False (see tmux adapter logs)")
+        except Exception as e:
+            logger.warning(f"Exception while connecting to tmux: {e}")
 
         # Connect to iTerm2
         try:
             if await self.iterm2.connect():
                 status["iterm2"] = True
                 self._adapters["iterm2"] = self.iterm2
-        except Exception:
-            pass
+            else:
+                logger.debug(
+                    "iTerm2 connection returned False (see iterm2 adapter logs)"
+                )
+        except Exception as e:
+            logger.warning(f"Exception while connecting to iTerm2: {e}")
 
         return status
 
@@ -179,7 +191,10 @@ class TerminalService:
         adapter = self._get_adapter_for_session(resolved_id)
         if not adapter:
             return CommandResult(
-                False, "Session not found or backend not available", SessionState.UNKNOWN, 0.0
+                False,
+                "Session not found or backend not available",
+                SessionState.UNKNOWN,
+                0.0,
             )
 
         return await adapter.send_command(
@@ -208,7 +223,7 @@ class TerminalService:
 
         return await adapter.detect_state(resolved_id)
 
-    async def get_session_status(self, session_id: str) -> dict:
+    async def get_session_status(self, session_id: str) -> dict[str, Any]:
         """Get comprehensive status of a session with analysis.
 
         Supports @project addressing for session lookup.
@@ -338,7 +353,7 @@ class TerminalService:
                     working_dir=str(project_dir),
                     command=command,
                 )
-            except Exception as e:
+            except Exception:
                 # Log error but try next backend
                 pass
 
@@ -380,20 +395,40 @@ class TerminalService:
         Returns:
             True if session was killed successfully
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.debug(f"kill_session called with: {session_id}")
+
         # Resolve @project address if needed
         resolved_id = await self._resolve_session_id(session_id)
+        logger.debug(f"Resolved session ID: {resolved_id}")
+
         if not resolved_id:
+            logger.error(f"Failed to resolve session ID: {session_id}")
             return False
 
+        logger.debug(f"Available adapters: {list(self._adapters.keys())}")
         adapter = self._get_adapter_for_session(resolved_id)
+        logger.debug(f"Got adapter: {adapter}")
+
         if not adapter:
+            logger.error(f"No adapter found for session: {resolved_id}")
             return False
 
         # Kill the session
-        success = await adapter.kill_session(resolved_id)
+        logger.debug(f"Calling adapter.kill_session({resolved_id})")
+        try:
+            success = await adapter.kill_session(resolved_id)
+            logger.debug(f"adapter.kill_session returned: {success}")
+        except Exception as e:
+            logger.exception(f"Exception during kill_session: {e}")
+            return False
 
         # Remove from cache if successful
         if success and resolved_id in self._sessions_cache:
             del self._sessions_cache[resolved_id]
+            logger.debug(f"Removed {resolved_id} from cache")
 
         return success

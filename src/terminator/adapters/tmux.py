@@ -1,18 +1,22 @@
 """Tmux terminal adapter implementation."""
 
 import asyncio
+import logging
+import re
+import subprocess
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import libtmux
 
 from .protocols import (
     CommandResult,
-    ITerminalAdapter,
     SessionState,
     TerminalType,
     UnifiedSession,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class TmuxAdapter:
@@ -22,19 +26,134 @@ class TmuxAdapter:
     All sync operations are wrapped with asyncio.to_thread().
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._server: Optional[libtmux.Server] = None
         self._sessions_cache: dict[str, UnifiedSession] = {}
 
+    def _parse_version(self, version_string: str) -> tuple[int, int, str]:
+        """Parse tmux version string like 'tmux 3.6a' into (3, 6, 'a').
+
+        Args:
+            version_string: Version string from tmux (e.g., 'tmux 3.6a')
+
+        Returns:
+            Tuple of (major, minor, suffix) where suffix is empty string if not present
+        """
+        match = re.match(r"tmux (\d+)\.(\d+)([a-z]?)", version_string.strip())
+        if match:
+            return (int(match.group(1)), int(match.group(2)), match.group(3))
+        return (0, 0, "")
+
+    def _versions_compatible(
+        self, client: tuple[int, int, str], server: tuple[int, int, str]
+    ) -> bool:
+        """Check if client and server versions are compatible.
+
+        Tmux requires exact major.minor match between client and server.
+
+        Args:
+            client: Client version tuple (major, minor, suffix)
+            server: Server version tuple (major, minor, suffix)
+
+        Returns:
+            True if versions are compatible (major.minor match)
+        """
+        return client[0] == server[0] and client[1] == server[1]
+
+    def _format_version(self, version: tuple[int, int, str]) -> str:
+        """Format version tuple as string.
+
+        Args:
+            version: Version tuple (major, minor, suffix)
+
+        Returns:
+            Formatted version string (e.g., '3.6a')
+        """
+        return f"{version[0]}.{version[1]}{version[2]}"
+
     async def connect(self) -> bool:
-        """Connect to tmux server."""
+        """Connect to tmux server with version compatibility checking.
+
+        Detects and warns about tmux client/server version mismatches which
+        can cause "not a terminal" errors. Provides actionable troubleshooting.
+
+        Returns:
+            True if connection successful, False otherwise
+        """
         try:
-            # Wrap sync operation in thread
+            # Get client version via tmux -V
+            try:
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    ["tmux", "-V"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                client_version_str = result.stdout.strip()
+                client_version = self._parse_version(client_version_str)
+                logger.debug(
+                    f"Tmux client version: {self._format_version(client_version)}"
+                )
+            except FileNotFoundError:
+                logger.error(
+                    "tmux command not found. Please install tmux: brew install tmux"
+                )
+                self._server = None
+                return False
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Failed to get tmux client version: {e}")
+                client_version = (0, 0, "")
+
+            # Connect to tmux server
             self._server = await asyncio.to_thread(libtmux.Server)
-            # Test connection
-            await asyncio.to_thread(lambda: self._server.sessions)
+
+            # Get server version via display-message
+            try:
+                server_version_result = await asyncio.to_thread(
+                    self._server.cmd, "display-message", "-p", "#{version}"
+                )
+                # Extract version string from tmux_cmd result
+                if isinstance(server_version_result, libtmux.common.tmux_cmd):
+                    server_version_str = str(server_version_result.stdout[0])
+                else:
+                    server_version_str = str(server_version_result)
+                server_version = self._parse_version(f"tmux {server_version_str}")
+                logger.debug(
+                    f"Tmux server version: {self._format_version(server_version)}"
+                )
+
+                # Check version compatibility
+                if client_version != (0, 0, "") and server_version != (0, 0, ""):
+                    if not self._versions_compatible(client_version, server_version):
+                        logger.warning(
+                            f"Tmux version mismatch detected!\n"
+                            f"  Client: {self._format_version(client_version)}\n"
+                            f"  Server: {self._format_version(server_version)}\n"
+                            f"This may cause 'not a terminal' errors.\n"
+                            f"Fix: Run 'tmux kill-server' to restart with matching version."
+                        )
+            except Exception as e:
+                logger.debug(f"Could not verify server version: {e}")
+
+            # Test connection by listing sessions
+            if self._server is not None:
+                server = self._server  # Capture for type safety in lambda
+                await asyncio.to_thread(lambda: server.sessions)
             return True
-        except Exception:
+
+        except Exception as e:
+            # Provide specific guidance for common errors
+            error_msg = str(e)
+            if "not a terminal" in error_msg.lower():
+                logger.error(
+                    f"Failed to connect to tmux: {e}\n"
+                    f"This error typically indicates a version mismatch.\n"
+                    f"Fix: Run 'tmux kill-server' and try again."
+                )
+            else:
+                logger.error(f"Failed to connect to tmux: {e}")
+
             self._server = None
             return False
 
@@ -44,23 +163,22 @@ class TmuxAdapter:
             return []
 
         sessions = []
-        tmux_sessions = await asyncio.to_thread(lambda: self._server.sessions)
+        server = self._server  # Capture for type safety in lambda
+        tmux_sessions = await asyncio.to_thread(lambda: server.sessions)
 
         for ts in tmux_sessions:
             windows = await asyncio.to_thread(lambda: list(ts.windows))
             for window in windows:
                 panes = await asyncio.to_thread(lambda: list(window.panes))
                 for pane in panes:
-                    session_id = (
-                        f"tmux:{ts.session_name}:{window.window_index}:{pane.pane_index}"
-                    )
+                    session_id = f"tmux:{ts.session_name}:{window.window_index}:{pane.pane_index}"
                     unified = UnifiedSession(
                         id=session_id,
                         name=f"{ts.session_name}/{window.window_name}[{pane.pane_index}]",
                         terminal_type=TerminalType.TMUX,
                         cwd=pane.pane_current_path or "",
-                        window_index=int(window.window_index),
-                        pane_index=int(pane.pane_index),
+                        window_index=int(window.window_index or 0),
+                        pane_index=int(pane.pane_index or 0),
                     )
                     sessions.append(unified)
                     self._sessions_cache[session_id] = unified
@@ -97,9 +215,11 @@ class TmuxAdapter:
             if not pane:
                 return "Pane not found"
 
-            output = await asyncio.to_thread(pane.capture_pane)
-            if isinstance(output, list):
-                output = "\n".join(output)
+            raw_output = await asyncio.to_thread(pane.capture_pane)
+            if isinstance(raw_output, list):
+                output: str = "\n".join(raw_output)
+            else:
+                output = str(raw_output)
 
             return output
 
@@ -132,7 +252,9 @@ class TmuxAdapter:
                 self._server.sessions.get, session_name=session_name
             )
             if not session:
-                return CommandResult(False, "Session not found", SessionState.UNKNOWN, 0)
+                return CommandResult(
+                    False, "Session not found", SessionState.UNKNOWN, 0
+                )
 
             window = await asyncio.to_thread(
                 session.windows.get, window_index=window_idx
@@ -200,7 +322,10 @@ class TmuxAdapter:
         for indicator in prompt_indicators:
             if last_line.endswith(indicator):
                 return True
-            if indicator in last_line and last_line.index(indicator) > len(last_line) // 2:
+            if (
+                indicator in last_line
+                and last_line.index(indicator) > len(last_line) // 2
+            ):
                 return True
 
         return False
@@ -214,7 +339,7 @@ class TmuxAdapter:
         else:
             return SessionState.RUNNING
 
-    async def get_session_status(self, session_id: str) -> dict:
+    async def get_session_status(self, session_id: str) -> dict[str, Any]:
         """Get comprehensive status of a session with analysis."""
         output = await self.get_session_output(session_id, lines=100)
         analysis = self._analyze_session_status(output)
@@ -227,7 +352,7 @@ class TmuxAdapter:
 
         return analysis
 
-    def _analyze_session_status(self, output: str) -> dict:
+    def _analyze_session_status(self, output: str) -> dict[str, Any]:
         """Analyze terminal output to determine working status."""
         if not output:
             return {
@@ -334,7 +459,7 @@ class TmuxAdapter:
         }
 
     def _generate_screen_summary(
-        self, lines: list[str], status: str, indicators: dict
+        self, lines: list[str], status: str, indicators: dict[str, Any]
     ) -> str:
         """Generate a concise summary of what's on screen."""
         if not lines:
@@ -367,7 +492,9 @@ class TmuxAdapter:
         # Detect error patterns
         error_keywords = ["error:", "failed", "exception", "traceback", "fatal"]
         errors = [
-            line for line in non_empty if any(kw in line.lower() for kw in error_keywords)
+            line
+            for line in non_empty
+            if any(kw in line.lower() for kw in error_keywords)
         ]
         if errors:
             summary_parts.append(f"Errors detected ({len(errors)} lines)")
@@ -453,31 +580,54 @@ class TmuxAdapter:
         Returns:
             True if session was killed successfully
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.debug(f"TmuxAdapter.kill_session called with: {session_id}")
+        logger.debug(f"Server connected: {self._server is not None}")
+
         if not self._server:
+            logger.error("Not connected to tmux server")
             return False
 
         parts = session_id.split(":")
+        logger.debug(f"Session ID parts: {parts}")
+
         if len(parts) != 4:
+            logger.error(
+                f"Invalid session ID format (expected 4 parts, got {len(parts)})"
+            )
             return False
 
         session_name = parts[1]
+        logger.debug(f"Extracted session name: {session_name}")
 
         try:
             # Get the session
+            logger.debug(f"Getting session from tmux server: {session_name}")
             session = await asyncio.to_thread(
                 self._server.sessions.get, session_name=session_name
             )
+            logger.debug(f"Got session object: {session}")
+
             if not session:
+                logger.error(f"Session not found in tmux: {session_name}")
                 return False
 
             # Kill the entire session
-            await asyncio.to_thread(session.kill_session)
+            # Note: session.kill_session() was deprecated, use session.kill() instead
+            logger.debug(f"Killing tmux session: {session_name}")
+            await asyncio.to_thread(session.kill)
+            logger.debug(f"Successfully killed tmux session: {session_name}")
 
             # Remove from cache
             if session_id in self._sessions_cache:
                 del self._sessions_cache[session_id]
+                logger.debug(f"Removed from cache: {session_id}")
 
             return True
 
-        except Exception:
+        except Exception as e:
+            logger.exception(f"Exception killing tmux session: {e}")
             return False
