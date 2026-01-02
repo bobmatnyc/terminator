@@ -16,6 +16,7 @@ from .services.terminal import TerminalService
 from .services.project_registry import ProjectRegistry
 from .services.session_monitor import SessionMonitorService
 from .services.claude_code_detector import ClaudeCodeDetector
+from .services.conversation_orchestrator import ConversationOrchestrator
 
 
 class Container:
@@ -41,6 +42,7 @@ class Container:
         self._instance_detector: Optional[InstanceDetector] = None
         self._session_monitor: Optional[SessionMonitorService] = None
         self._claude_code_detector: Optional[ClaudeCodeDetector] = None
+        self._conversation_orchestrator: Optional[ConversationOrchestrator] = None
 
     @property
     def settings(self) -> Settings:
@@ -150,6 +152,29 @@ class Container:
             self._claude_code_detector = ClaudeCodeDetector()
         return self._claude_code_detector
 
+    def get_conversation_orchestrator(self) -> ConversationOrchestrator:
+        """Get or create conversation orchestrator.
+
+        Returns:
+            ConversationOrchestrator instance (singleton)
+        """
+        if self._conversation_orchestrator is None:
+            detector = self.get_claude_code_detector()
+            terminal = self.get_terminal_service()
+
+            async def send_command(session_id: str, command: str) -> None:
+                await terminal.send_command(session_id, command)
+
+            async def get_output(session_id: str, lines: int) -> str:
+                return await terminal.get_session_output(session_id, lines)
+
+            self._conversation_orchestrator = ConversationOrchestrator(
+                detector=detector,
+                send_command_fn=send_command,
+                get_output_fn=get_output,
+            )
+        return self._conversation_orchestrator
+
     def reset(self) -> None:
         """Reset all cached instances.
 
@@ -164,6 +189,7 @@ class Container:
         self._instance_detector = None
         self._session_monitor = None
         self._claude_code_detector = None
+        self._conversation_orchestrator = None
 
 
 # Global container instance for CLI usage
