@@ -15,6 +15,7 @@ from .services.llm import LLMService
 from .services.terminal import TerminalService
 from .services.project_registry import ProjectRegistry
 from .services.session_monitor import SessionMonitorService
+from .services.claude_code_detector import ClaudeCodeDetector
 
 
 class Container:
@@ -39,6 +40,7 @@ class Container:
         self._project_registry: Optional[ProjectRegistry] = None
         self._instance_detector: Optional[InstanceDetector] = None
         self._session_monitor: Optional[SessionMonitorService] = None
+        self._claude_code_detector: Optional[ClaudeCodeDetector] = None
 
     @property
     def settings(self) -> Settings:
@@ -138,6 +140,16 @@ class Container:
             )
         return self._session_monitor
 
+    def get_claude_code_detector(self) -> ClaudeCodeDetector:
+        """Get or create Claude Code detector.
+
+        Returns:
+            ClaudeCodeDetector instance (singleton)
+        """
+        if self._claude_code_detector is None:
+            self._claude_code_detector = ClaudeCodeDetector()
+        return self._claude_code_detector
+
     def reset(self) -> None:
         """Reset all cached instances.
 
@@ -151,6 +163,7 @@ class Container:
         self._project_registry = None
         self._instance_detector = None
         self._session_monitor = None
+        self._claude_code_detector = None
 
 
 # Global container instance for CLI usage
