@@ -47,7 +47,10 @@ class ClaudeCodeDetector:
 
     # Patterns that indicate Claude Code is ready for input
     READY_PATTERNS = [
-        r"^\s*>\s*$",  # Claude Code prompt (> at start of line, possibly with whitespace)
+        r"^\s*>\s+",  # Claude Code prompt with suggestion (> followed by space and text)
+        r"^\s*>\s*$",  # Claude Code prompt (bare > at end of line)
+        r"matsuoka-com \| git:",  # Status bar pattern (project name)
+        r"\| Opus \d+\.\d+ \|",  # Model indicator in status bar
         r"╭─.*Claude",  # Claude Code UI header
         r"What would you like to do\?",  # Initial prompt
         r"How can I help",  # Help prompt

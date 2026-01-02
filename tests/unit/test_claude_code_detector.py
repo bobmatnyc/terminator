@@ -37,7 +37,8 @@ class TestClaudeCodeDetector:
 
         assert result.state == ClaudeCodeState.READY
         assert result.confidence == 0.9
-        assert result.matched_pattern == r"^\s*>\s*$"
+        # Should match either bare prompt or prompt with space pattern
+        assert result.matched_pattern in [r"^\s*>\s+", r"^\s*>\s*$"]
 
     def test_detect_ready_with_ui_header(self, detector: ClaudeCodeDetector):
         """Detect READY state from UI header."""
@@ -50,12 +51,51 @@ class TestClaudeCodeDetector:
         result = detector.detect_state(output)
 
         assert result.state == ClaudeCodeState.READY
-        # Should match UI header first (before prompt), or the prompt pattern
-        assert result.matched_pattern in [r"╭─.*Claude", r"^\s*>\s*$"]
+        # Should match UI header first, or any of the prompt patterns
+        assert result.matched_pattern in [r"╭─.*Claude", r"^\s*>\s+", r"^\s*>\s*$"]
 
     def test_detect_ready_with_help_prompt(self, detector: ClaudeCodeDetector):
         """Detect READY state from help text."""
         output = "What would you like to do?"
+        result = detector.detect_state(output)
+
+        assert result.state == ClaudeCodeState.READY
+        assert result.confidence == 0.9
+
+    def test_detect_ready_with_suggestion(self, detector: ClaudeCodeDetector):
+        """Detect READY state with Claude's suggestion prompt."""
+        output = '''> Try "edit chat-bot-fixed.tsx to..."'''
+        result = detector.detect_state(output)
+
+        assert result.state == ClaudeCodeState.READY
+        assert result.confidence == 0.9
+        assert result.matched_pattern == r"^\s*>\s+"
+
+    def test_detect_ready_with_status_bar_project(self, detector: ClaudeCodeDetector):
+        """Detect READY state from status bar with project name."""
+        output = "matsuoka-com | git: main | Opus 4.5 |"
+        result = detector.detect_state(output)
+
+        assert result.state == ClaudeCodeState.READY
+        assert result.confidence == 0.9
+        assert result.matched_pattern == r"matsuoka-com \| git:"
+
+    def test_detect_ready_with_status_bar_model(self, detector: ClaudeCodeDetector):
+        """Detect READY state from status bar model indicator."""
+        output = "| Opus 4.5 | Budget: 95%"
+        result = detector.detect_state(output)
+
+        assert result.state == ClaudeCodeState.READY
+        assert result.confidence == 0.9
+        assert result.matched_pattern == r"\| Opus \d+\.\d+ \|"
+
+    def test_detect_ready_multiline_with_suggestion(self, detector: ClaudeCodeDetector):
+        """Detect READY state with suggestion in multiline output."""
+        output = """Previous command output...
+Some results here
+
+> Try "edit main.py to add logging"
+"""
         result = detector.detect_state(output)
 
         assert result.state == ClaudeCodeState.READY
