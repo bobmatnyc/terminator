@@ -336,6 +336,89 @@ async def run_manage():
 
 
 @app.command()
+def converse(
+    target: str = typer.Argument(..., help="Target session (e.g., @matsuoka or session ID)"),
+    message: str = typer.Argument(..., help="Message to send to target session"),
+    source: str = typer.Option(None, "--source", "-s", help="Source session for relay mode"),
+    max_turns: int = typer.Option(1, "--turns", "-t", help="Maximum conversation turns"),
+    ready_timeout: float = typer.Option(60.0, "--ready-timeout", help="Seconds to wait for session ready"),
+    response_timeout: float = typer.Option(300.0, "--response-timeout", help="Seconds to wait for response"),
+) -> None:
+    """Send a message to a Claude Code session and get a response.
+
+    Single session mode (default):
+        terminator converse @matsuoka "What's the project status?"
+
+    Relay mode (two-way meta-communication):
+        terminator converse @target "Analyze the code" --source @tester
+    """
+    asyncio.run(run_converse(target, message, source, max_turns, ready_timeout, response_timeout))
+
+
+async def run_converse(
+    target: str,
+    message: str,
+    source: str | None,
+    max_turns: int,
+    ready_timeout: float,
+    response_timeout: float,
+) -> None:
+    """Execute the converse command."""
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    container = get_container()
+    orchestrator = container.get_conversation_orchestrator()
+
+    # Override timeouts if provided
+    orchestrator.ready_timeout = ready_timeout
+    orchestrator.response_timeout = response_timeout
+
+    if source:
+        # Relay mode
+        console.print(f"[bold blue]Relay mode:[/] {source} ↔ {target}")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Waiting for sessions...", total=None)
+            result = await orchestrator.relay_between_sessions(
+                source_session=source,
+                target_session=target,
+                initial_message=message,
+                max_turns=max_turns,
+            )
+    else:
+        # Single session mode
+        console.print(f"[bold blue]Sending to:[/] {target}")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Waiting for response...", total=None)
+            result = await orchestrator.run_conversation(
+                session_id=target,
+                initial_message=message,
+                max_turns=max_turns,
+            )
+
+    # Display results
+    if result.success:
+        console.print(f"\n[bold green]✓ Conversation complete[/] ({result.total_time:.1f}s)")
+        for i, turn in enumerate(result.turns, 1):
+            console.print(Panel(
+                turn.response[-2000:] if len(turn.response) > 2000 else turn.response,
+                title=f"Turn {i}: {turn.speaker} ({turn.response_time:.1f}s)",
+                border_style="green",
+            ))
+    else:
+        console.print(f"\n[bold red]✗ Conversation failed[/]")
+        console.print(f"Error: {result.error}")
+        raise typer.Exit(1)
+
+
+@app.command()
 def start(
     project_path: str = typer.Argument(..., help="Path to project directory"),
     agent: str = typer.Option(
