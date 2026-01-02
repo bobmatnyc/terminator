@@ -367,6 +367,11 @@ async def run_converse(
     from rich.progress import Progress, SpinnerColumn, TextColumn
 
     container = get_container()
+    terminal_service = container.get_terminal_service()
+
+    # Connect to terminal backends first
+    await terminal_service.connect_all()
+
     orchestrator = container.get_conversation_orchestrator()
 
     # Override timeouts if provided
